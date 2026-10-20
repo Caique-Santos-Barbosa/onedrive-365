@@ -194,6 +194,11 @@ sealed partial class TrayApp : ApplicationContext
             return;
         }
         if (msg == "quit") { await Quit(confirm: false); return; }
+        if (msg == "diag:throw")   // diagnóstico: erro proposital fora de qualquer try (testa a rede de segurança do Program)
+        {
+            _ui.BeginInvoke(new Action(() => throw new InvalidOperationException("teste da rede de segurança")));
+            return;
+        }
         if (msg.StartsWith("setcolor:"))   // diagnóstico: setcolor:<cor>|<caminho> (mesmo código do "Cor da pasta", sem a janela)
         {
             await _ready.Task;

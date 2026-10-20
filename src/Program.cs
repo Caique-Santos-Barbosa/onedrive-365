@@ -10,6 +10,11 @@ static class Program
     static int Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        // Rede de segurança: erro inesperado vai para o log e o app segue na bandeja (nunca a caixa técnica do .NET)
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, e) => Log.Error("Erro não tratado na interface", e.Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) => { Log.Error("Erro não tratado em tarefa", e.Exception); e.SetObserved(); };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("Erro fatal", e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()));
         TaskbarIdentity.ApplyToProcess();
 
         if (args.Contains("--uninstall"))
