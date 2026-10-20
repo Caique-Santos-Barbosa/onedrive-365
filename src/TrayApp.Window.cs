@@ -16,6 +16,7 @@ sealed partial class TrayApp
     Graph.Account? _account;
     DateTime _accountLoaded;
     bool _signedOut;
+    List<Library>? _libraryCatalog;   // última lista de "Adicionar bibliotecas que eu acesso"
     DateTime? _lastActivity;
     readonly List<ActivityItem> _activity = new();
     readonly List<Notice> _notices = new();
@@ -313,6 +314,28 @@ sealed partial class TrayApp
                     if (lib != null) { await RemoveLibrary(lib); PushState(); }
                     break;
                 case "addAll": await AddAll(); PushState(); break;
+                case "listLibraries":
+                    try
+                    {
+                        _libraryCatalog = await Graph.AllLibraries();
+                        _window?.Send("libraryCatalog", new
+                        {
+                            libraries = _libraryCatalog.OrderBy(l => l.Site, StringComparer.CurrentCultureIgnoreCase).ThenBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase)
+                                .Select(l => new { id = l.DriveId, name = l.Name, site = l.Site, webUrl = l.WebUrl,
+                                                   added = _settings.Libraries.Any(s => s.DriveId == l.DriveId && s.Root == "") }),
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Falha ao listar bibliotecas", ex);
+                        _window?.Send("libraryCatalog", new { error = "Não foi possível buscar as bibliotecas agora. Verifique a internet e tente de novo." });
+                    }
+                    break;
+                case "saveLibraries":
+                    if (_libraryCatalog != null)
+                        await SetLibraries(a.GetProperty("ids").EnumerateArray().Select(x => x.GetString()!).ToHashSet(), _libraryCatalog);
+                    PushState();
+                    break;
                 case "toggleFolder":
                     _backup!.SetEnabled(Arg("id"), a.GetProperty("on").GetBoolean());
                     RegisterContextMenu();

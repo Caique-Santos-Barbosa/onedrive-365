@@ -193,6 +193,24 @@
   .node svg.f { width: 18px; height: 18px; color: #E8B33C; }
   .node .nm { overflow: hidden; text-overflow: ellipsis; }
   .node.off .nm { color: var(--ink-soft); }
+  /* Triagem de bibliotecas */
+  .libsearch { margin: 6px 24px 0; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: var(--surface); color: var(--ink); font: inherit; outline: 0; }
+  .libsearch:focus { border-color: var(--accent); }
+  .libbar { display: flex; gap: 16px; margin: 8px 24px 0; font-size: 13px; }
+  .libbar button { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; font-weight: 600; }
+  .libsite { padding: 10px 14px 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em; }
+  .libitem { display: grid; grid-template-columns: 18px 24px 1fr; gap: 10px; align-items: center; padding: 7px 14px; cursor: pointer; }
+  .libitem:hover { background: var(--surface-2); }
+  .libitem input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+  .libitem img { width: 22px; height: 22px; }
+  .libitem .sub { font-size: 12px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .libitem .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .libbar[hidden], .libsearch[hidden] { display: none; }
+  .libitem > span { min-width: 0; }
+  #libList { overflow-x: hidden; }
+  .btn.primary:disabled { opacity: .45; cursor: default; filter: none; }
+  .libload { display: grid; place-items: center; gap: 12px; padding: 48px 20px; color: var(--ink-soft); text-align: center; }
+  .libload .spin { width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin .9s linear infinite; }
   .timeinp { height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; background: var(--surface); color: var(--ink); font: inherit; }
   .icon-only { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 17px; }
   .scrim.open { display: block; }
@@ -354,7 +372,7 @@
     <h1>SharePoint</h1>
     <p class="lead">Bibliotecas que aparecem em <b class="spPath"></b>. Para adicionar outra, abra a biblioteca no navegador e clique em <b>Sincronizar</b>.</p>
     <div class="card"><div class="rows" id="spRows"></div>
-      <div class="actions"><button class="btn" data-cmd="addAll"><svg><use href="#i-plus"/></svg>Adicionar todas que eu acesso</button></div>
+      <div class="actions"><button class="btn" id="openLibPicker"><svg><use href="#i-plus"/></svg>Adicionar bibliotecas que eu acesso</button></div>
     </div>
   </section>
 
@@ -406,6 +424,18 @@
     <div class="foot">
       <span class="muted" id="pickCount"></span>
       <span class="actions" style="margin:0"><button class="btn" id="pickCancel">Cancelar</button><button class="btn primary" id="pickSave">Salvar</button></span>
+    </div>
+  </div>
+</div>
+<div class="modal-back" id="libBack" role="dialog" aria-modal="true" aria-labelledby="libTitle">
+  <div class="modal">
+    <header><h2 id="libTitle">Bibliotecas do SharePoint</h2><div class="muted">Marque as bibliotecas que devem aparecer em <b class="spPath"></b>. Nada é baixado até você abrir um arquivo.</div></header>
+    <input class="libsearch" id="libSearch" type="search" placeholder="Filtrar por site ou biblioteca" hidden>
+    <div class="libbar" id="libBar" hidden><button id="libAll">Marcar todas</button><button id="libNone">Desmarcar todas</button></div>
+    <div class="tree" id="libList"></div>
+    <div class="foot">
+      <span class="muted" id="libCount"></span>
+      <span class="actions" style="margin:0"><button class="btn" id="libCancel">Cancelar</button><button class="btn primary" id="libSave" disabled>Salvar</button></span>
     </div>
   </div>
 </div>
@@ -600,7 +630,7 @@
           <button class="btn danger" data-remove-lib="${esc(l.name)}">Remover</button>
         </div>
       </div>`).join("")
-      : `<div class="empty">${icon("sites")}<h2>Nenhuma biblioteca</h2><div>Abra uma biblioteca no SharePoint e clique em "Sincronizar".</div></div>`;
+      : `<div class="empty">${icon("sharepoint")}<h2>Nenhuma biblioteca</h2><div>Abra uma biblioteca no SharePoint e clique em "Sincronizar".</div></div>`;
   }
 
   function renderAccount() {
@@ -717,12 +747,65 @@
     }
     refreshChecks();
   });
+  // ---- Triagem: "Adicionar bibliotecas que eu acesso" ----
+  let libs = null, libPick = new Set();
+  function openLibPicker() {
+    libs = null; libPick = new Set();
+    $("#libList").innerHTML = `<div class="libload"><div class="spin"></div>Procurando as bibliotecas que você acessa…<br><span style="font-size:12px">Com muitos sites, isso pode levar um minuto.</span></div>`;
+    $("#libSearch").hidden = $("#libBar").hidden = true;
+    $("#libSearch").value = "";
+    $("#libSave").disabled = true;
+    $("#libCount").textContent = "";
+    document.querySelectorAll(".spPath").forEach((e) => e.textContent = `${S.letter}\\SharePoint`);
+    $("#libBack").classList.add("open");
+    send("listLibraries");
+  }
+  function renderLibs() {
+    const q = $("#libSearch").value.trim().toLowerCase();
+    const shown = libs.filter((l) => !q || (l.site + " " + l.name).toLowerCase().includes(q));
+    let html = "", site = null;
+    for (const l of shown) {
+      if (l.site !== site) { site = l.site; html += `<div class="libsite">${esc(site)}</div>`; }
+      html += `<label class="libitem"><input type="checkbox" data-lib="${esc(l.id)}" ${libPick.has(l.id) ? "checked" : ""}>
+        <img src="${S.sharePointIcon}" alt=""><span><div class="nm">${esc(l.name)}</div><div class="sub">${esc(readableUrl(l.webUrl))}</div></span></label>`;
+    }
+    $("#libList").innerHTML = html || `<div class="libload">Nenhuma biblioteca com "${esc(q)}".</div>`;
+    const was = new Set(libs.filter((l) => l.added).map((l) => l.id));
+    const add = [...libPick].filter((id) => !was.has(id)).length, rem = [...was].filter((id) => !libPick.has(id)).length;
+    $("#libCount").textContent = `${libPick.size} de ${libs.length} marcada(s)` + (add || rem ? ` · ${[add && `+${add}`, rem && `-${rem}`].filter(Boolean).join(" ")}` : "");
+    $("#libSave").disabled = !add && !rem;
+  }
+  $("#openLibPicker").onclick = openLibPicker;
+  $("#libSearch").oninput = () => libs && renderLibs();
+  $("#libAll").onclick = () => { const q = $("#libSearch").value.trim().toLowerCase(); libs.filter((l) => !q || (l.site + " " + l.name).toLowerCase().includes(q)).forEach((l) => libPick.add(l.id)); renderLibs(); };
+  $("#libNone").onclick = () => { const q = $("#libSearch").value.trim().toLowerCase(); libs.filter((l) => !q || (l.site + " " + l.name).toLowerCase().includes(q)).forEach((l) => libPick.delete(l.id)); renderLibs(); };
+  document.addEventListener("change", (e) => {
+    const id = e.target.dataset.lib;
+    if (id == null || !libs) return;
+    if (e.target.checked) libPick.add(id); else libPick.delete(id);
+    renderLibs();
+  });
+  $("#libCancel").onclick = () => { $("#libBack").classList.remove("open"); libs = null; };
+  $("#libSave").onclick = () => { send("saveLibraries", { ids: [...libPick] }); $("#libBack").classList.remove("open"); libs = null; };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#libBack").classList.contains("open")) $("#libCancel").click(); });
+
   $("#pickCancel").onclick = () => { $("#pickBack").classList.remove("open"); pick = null; };
   $("#pickSave").onclick = () => { send("saveExclusions", { id: pick.id, excluded: [...pick.excluded] }); $("#pickBack").classList.remove("open"); pick = null; };
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && pick) $("#pickCancel").click(); });
 
   window.chrome.webview.addEventListener("message", (e) => {
     const m = e.data;
+    if (m.type === "libraryCatalog") {
+      if (!$("#libBack").classList.contains("open")) return;
+      if (m.payload.error) { $("#libList").innerHTML = `<div class="libload">${esc(m.payload.error)}</div>`; return; }
+      libs = m.payload.libraries;
+      libPick = new Set(libs.filter((l) => l.added).map((l) => l.id));
+      if (!libs.length) { $("#libList").innerHTML = `<div class="libload">Nenhuma biblioteca encontrada para esta conta.</div>`; return; }
+      $("#libSearch").hidden = $("#libBar").hidden = false;
+      renderLibs();
+      $("#libSearch").focus();
+      return;
+    }
     if (m.type === "dirs" && pick && m.payload.id === pick.id) {
       const box = document.querySelector(`[data-kids="${CSS.escape(m.payload.rel)}"]`);
       if (box) {

@@ -115,12 +115,27 @@ static class Graph
     public static async Task<List<Library>> AllLibraries()
     {
         var result = new List<Library>();
-        foreach (var site in await GetAll("sites?search=*&$select=id,displayName,webUrl"))
+        var sites = (await GetAll("sites?search=*&$select=id,displayName,webUrl"))
+            .Where(s => s.GetProperty("webUrl").GetString() is { } u
+                        && !SystemSites.Any(x => u.Contains(x, StringComparison.OrdinalIgnoreCase))
+                        && !u.Contains("vivaengage", StringComparison.OrdinalIgnoreCase));
+        using var gate = new SemaphoreSlim(8);
+        await Task.WhenAll(sites.Select(async site =>
         {
-            var url = site.GetProperty("webUrl").GetString() ?? "";
-            if (SystemSites.Any(s => url.Contains(s, StringComparison.OrdinalIgnoreCase)) || url.Contains("vivaengage", StringComparison.OrdinalIgnoreCase))
-                continue;
-            var siteId = site.GetProperty("id").GetString()!;
+            await gate.WaitAsync();
+            try { var libs = await SiteLibraries(site); lock (result) result.AddRange(libs); }
+            finally { gate.Release(); }
+        }));
+        return result;
+    }
+
+    static async Task<List<Library>> SiteLibraries(JsonElement site)
+    {
+        var result = new List<Library>();
+        var url = site.GetProperty("webUrl").GetString() ?? "";
+        var siteName = site.GetProperty("displayName").GetString() ?? url;
+        var siteId = site.GetProperty("id").GetString()!;
+        {
             try
             {
                 var defaultId = (await Get($"sites/{siteId}/drive?$select=id")).GetProperty("id").GetString();
@@ -132,7 +147,8 @@ static class Graph
                     {
                         DriveId = id,
                         WebUrl = d.GetProperty("webUrl").GetString() ?? url,
-                        Name = LibraryName(site.GetProperty("displayName").GetString() ?? url, d.GetProperty("name").GetString()!, id == defaultId),
+                        Name = LibraryName(siteName, d.GetProperty("name").GetString()!, id == defaultId),
+                        Site = siteName,
                     });
                 }
             }

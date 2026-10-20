@@ -55,6 +55,7 @@ public sealed class Library
     public string DriveId { get; set; } = "";
     public string Root { get; set; } = "";      // subpasta quando o usuário sincroniza só uma pasta
     public string WebUrl { get; set; } = "";
+    [System.Text.Json.Serialization.JsonIgnore] public string Site { get; set; } = "";
 }
 
 public sealed class Settings

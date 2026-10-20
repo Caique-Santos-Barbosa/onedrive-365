@@ -246,6 +246,27 @@ sealed partial class TrayApp : ApplicationContext
                $"Disponível em {SharedRoot}. Os arquivos baixam só quando você abre.");
     }
 
+    /// Triagem de "Adicionar bibliotecas que eu acesso": marcadas ficam na unidade, desmarcadas saem.
+    /// Bibliotecas sincronizadas só numa subpasta (botão Sincronizar numa pasta) não são mexidas.
+    async Task SetLibraries(IReadOnlyCollection<string> driveIds, List<Library> catalog)
+    {
+        var removed = _settings.Libraries.RemoveAll(l => l.Root == "" && catalog.Any(c => c.DriveId == l.DriveId) && !driveIds.Contains(l.DriveId));
+        var toAdd = catalog.Where(c => driveIds.Contains(c.DriveId) && !_settings.Libraries.Any(l => l.DriveId == c.DriveId && l.Root == "")).ToList();
+        foreach (var lib in toAdd)
+        {
+            var name = lib.Name;
+            for (var i = 2; _settings.Libraries.Any(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase)); i++)
+                name = $"{lib.Name} ({i})";
+            _settings.Libraries.Add(new Library { Name = name, DriveId = lib.DriveId, WebUrl = lib.WebUrl });
+        }
+        if (removed == 0 && toAdd.Count == 0) return;
+        Log.Info($"Triagem de bibliotecas: +{toAdd.Count} -{removed}");
+        await ApplyLibraries();
+        if (toAdd.Count > 0)
+            Notify(toAdd.Count == 1 ? $"\"{toAdd[0].Name}\" adicionada" : $"{toAdd.Count} bibliotecas adicionadas",
+                   $"Disponível em {SharedRoot}. Os arquivos baixam só quando você abre.");
+    }
+
     async Task RemoveLibrary(Library lib)
     {
         if (MessageBox.Show($"Tirar \"{lib.Name}\" da unidade {Letter}?\n\nNada é apagado no SharePoint.", Brand.Name,
