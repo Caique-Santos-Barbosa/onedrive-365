@@ -21,8 +21,14 @@ static class Program
             return Installer.Uninstall(SendToRunning);
 
         // Processo elevado (UAC): driver WinFsp + registro dos selos em HKLM
-        if (args.Contains("--elevated-setup")) return Installer.ElevatedSetup();
-        if (args.Contains("--elevated-cleanup")) { Overlays.UnregisterMachine(); MenuPackage.UntrustCertificate(); return 0; }
+        if (args.Contains("--elevated-setup")) return Installer.ElevatedSetup(ArgValue(args, "--letter"), ArgValue(args, "--old-letter"));
+        if (args.Contains("--elevated-cleanup"))
+        {
+            Overlays.UnregisterMachine();
+            MenuPackage.UntrustCertificate();
+            if (ArgValue(args, "--letter") is { } letter) Installer.DefenderExclusion(letter, add: false);
+            return 0;
+        }
 
         if (args.Length == 2 && args[0] == "--write-auth-page")   // diagnóstico: gera a página de login num idioma
         {
@@ -104,6 +110,13 @@ static class Program
     /// Abre uma instância nova que assume quando esta terminar de encerrar (chame Quit logo depois).
     public static void Relaunch() =>
         System.Diagnostics.Process.Start(IsInstalledCopy() ? Paths.InstalledExe : Environment.ProcessPath!, "--restart");
+
+    /// Valor depois de um argumento ("--letter M:" -> "M:"); null se não houver.
+    static string? ArgValue(string[] args, string name)
+    {
+        var i = Array.IndexOf(args, name);
+        return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+    }
 
     static bool IsInstalledCopy() =>
         string.Equals(Path.GetFullPath(Environment.ProcessPath!), Path.GetFullPath(Paths.InstalledExe), StringComparison.OrdinalIgnoreCase);

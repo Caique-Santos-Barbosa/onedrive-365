@@ -114,6 +114,7 @@ sealed partial class TrayApp
             interceptSync = _settings.InterceptSync,
             org = OrgName(),
             pausedUntil = _pausedUntil,
+            defenderExcluded = string.Equals(_settings.DefenderExcludedLetter, _settings.DriveLetter, StringComparison.OrdinalIgnoreCase),
             schedule = new { on = _settings.ScheduleEnabled, from = _settings.ScheduleFrom, to = _settings.ScheduleTo, inside = InSchedule() },
             fileIcons = _activity.Take(60).Select(a => Path.GetExtension(a.Name).TrimStart('.').ToLowerInvariant())
                 .Concat((_backupProgress?.Transferring ?? new List<BackupManager.Transfer>()).Select(t => Path.GetExtension(t.Name).TrimStart('.').ToLowerInvariant()))
@@ -305,6 +306,15 @@ sealed partial class TrayApp
                     if (Path.IsPathRooted(where)) OpenFolder(where);
                     break;
                 case "openLogs": OpenFolder(Paths.LogsDir); break;
+                case "defender":
+                    if (await Task.Run(() => Installer.RunElevatedSetup(_settings)))
+                    {
+                        _settings.ElevationDeclined = false;
+                        _settings.DefenderExcludedLetter = _settings.DriveLetter;
+                        _settings.Save();
+                    }
+                    PushState();
+                    break;
                 case "quit": _window?.Close(); await Quit(confirm: true); break;
                 case "reveal": Reveal(Arg("path")); break;
                 case "openHit": Reveal(Path.Combine(_settings.DriveLetter + "\\", Brand.OneDriveFolder, Arg("path").Replace('/', '\\'))); break;

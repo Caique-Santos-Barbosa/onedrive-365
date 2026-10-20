@@ -68,6 +68,8 @@ public sealed class Settings
     public List<Library> Libraries { get; set; } = new();
     public List<BackupFolder> Backups { get; set; } = new();
     public bool ElevationDeclined { get; set; }
+    /// Letra que está nas exclusões do Microsoft Defender (null = ainda não excluída).
+    public string? DefenderExcludedLetter { get; set; }
     public bool BackupDialogShown { get; set; }
     public bool TrayPromoted { get; set; }
     public string? LastEmail { get; set; }

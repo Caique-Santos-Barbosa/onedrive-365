@@ -67,16 +67,6 @@ sealed partial class TrayApp : ApplicationContext
                 initialUrl = null;
             }
 
-            var overlaysJustRegistered = false;
-            if (Installer.NeedsElevatedSetup() && (!Installer.WinFspInstalled() || !_settings.ElevationDeclined))
-            {
-                var ok = await Task.Run(Installer.RunElevatedSetup);
-                _settings.ElevationDeclined = !ok;
-                overlaysJustRegistered = ok;
-                if (!Installer.WinFspInstalled())
-                    throw new InvalidOperationException("O WinFsp não foi instalado. Abra o OneDrive 365 de novo para tentar outra vez.");
-            }
-
             _settings.DriveLetter ??= PickLetter();
             if (LetterTakenByOther(_settings.DriveLetter))
             {
@@ -87,6 +77,18 @@ sealed partial class TrayApp : ApplicationContext
                 Log.Info($"Letra {taken} em uso por outra unidade: usando {_settings.DriveLetter}");
                 AddNotice("info", $"Unidade agora em {_settings.DriveLetter}", $"A letra {taken} está sendo usada por outra unidade deste computador.");
             }
+
+            var overlaysJustRegistered = false;
+            if (Installer.NeedsElevatedSetup(_settings) && (!Installer.WinFspInstalled() || !_settings.ElevationDeclined))
+            {
+                var ok = await Task.Run(() => Installer.RunElevatedSetup(_settings));
+                _settings.ElevationDeclined = !ok;
+                if (ok) { _settings.DefenderExcludedLetter = _settings.DriveLetter; _settings.Save(); }
+                overlaysJustRegistered = ok;
+                if (!Installer.WinFspInstalled())
+                    throw new InvalidOperationException("O WinFsp não foi instalado. Abra o OneDrive 365 de novo para tentar outra vez.");
+            }
+
             if (!Rclone.HasRemote("onedrive"))
             {
                 // Primeira execução: assistente (e-mail -> login no navegador -> M: -> backup -> pronto)

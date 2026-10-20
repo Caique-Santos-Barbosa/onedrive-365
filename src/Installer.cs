@@ -189,14 +189,19 @@ static class Installer
         return k?.GetValue("InstallDir") is string dir && File.Exists(Path.Combine(dir, "bin", "winfsp-x64.dll"));
     }
 
-    public static bool NeedsElevatedSetup() => !WinFspInstalled() || !Overlays.MachineRegistered() || !MenuPackage.CertificateTrusted();
+    public static bool NeedsElevatedSetup(Settings settings) =>
+        !WinFspInstalled() || !Overlays.MachineRegistered() || !MenuPackage.CertificateTrusted()
+        || !string.Equals(settings.DefenderExcludedLetter, settings.DriveLetter, StringComparison.OrdinalIgnoreCase);
 
     /// Pede UAC uma vez e roda "--elevated-setup". Devolve false se o usuário recusar.
-    public static bool RunElevatedSetup()
+    public static bool RunElevatedSetup(Settings settings)
     {
         try
         {
-            var p = Process.Start(new ProcessStartInfo(Paths.InstalledExe, "--elevated-setup") { UseShellExecute = true, Verb = "runas" });
+            var args = $"--elevated-setup --letter {settings.DriveLetter}";
+            if (settings.DefenderExcludedLetter is { } old && !string.Equals(old, settings.DriveLetter, StringComparison.OrdinalIgnoreCase))
+                args += $" --old-letter {old}";
+            var p = Process.Start(new ProcessStartInfo(Paths.InstalledExe, args) { UseShellExecute = true, Verb = "runas" });
             p!.WaitForExit();
             Log.Info($"Configuração elevada terminou com {p.ExitCode}");
             return p.ExitCode == 0;
@@ -208,8 +213,8 @@ static class Installer
         }
     }
 
-    /// Roda já elevado: instala o WinFsp (se faltar) e registra os selos de status.
-    public static int ElevatedSetup()
+    /// Roda já elevado: instala o WinFsp (se faltar), registra os selos de status e põe a unidade nas exclusões do Defender.
+    public static int ElevatedSetup(string? letter, string? oldLetter)
     {
         try
         {
@@ -224,6 +229,8 @@ static class Installer
             }
             Overlays.RegisterMachine();
             MenuPackage.TrustCertificate();   // menu "OneDrive 365" no menu compacto do Windows 11
+            if (oldLetter != null) DefenderExclusion(oldLetter, add: false);
+            if (letter != null) DefenderExclusion(letter, add: true);
             return 0;
         }
         catch (Exception ex)
@@ -231,6 +238,28 @@ static class Installer
             Log.Error("Configuração elevada falhou", ex);
             return 1;
         }
+    }
+
+    /// Exclusão da unidade no Microsoft Defender. Sem ela, uma verificação completa leria (e baixaria da nuvem)
+    /// todos os arquivos da unidade. O que é aberto pela unidade vai para o cache em C:, que continua verificado.
+    /// Com outro antivírus no lugar do Defender o comando falha: só registra no log.
+    public static void DefenderExclusion(string letter, bool add)
+    {
+        if (letter.Length < 2 || !char.IsLetter(letter[0]) || letter[1] != ':') return;
+        var path = $"{char.ToUpperInvariant(letter[0])}:\\";
+        var cmd = $"{(add ? "Add" : "Remove")}-MpPreference -ExclusionPath '{path}' -ErrorAction Stop";
+        try
+        {
+            var psi = new ProcessStartInfo("powershell.exe", $"-NoProfile -NonInteractive -Command \"{cmd}\"")
+            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
+            using var p = Process.Start(psi)!;
+            var err = p.StandardError.ReadToEnd();
+            p.WaitForExit(30_000);
+            Log.Info(p.ExitCode == 0
+                ? $"Defender: {path} {(add ? "excluída da verificação" : "removida das exclusões")}"
+                : $"Defender: não alterei a exclusão de {path} ({err.Trim().Split('\n')[0]})");
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { Log.Error("Exclusão do Defender", ex); }
     }
 
     static void ExtractIfChanged(string resource, string target)
@@ -276,7 +305,8 @@ static class Installer
         Overlays.RemovePerUser();
         TrayApp.RemoveContextMenu();
         MenuPackage.UnregisterAsync().Wait(TimeSpan.FromSeconds(60));
-        try { Process.Start(new ProcessStartInfo(Environment.ProcessPath!, "--elevated-cleanup") { UseShellExecute = true, Verb = "runas" })?.WaitForExit(); }
+        var cleanupArgs = settings.DefenderExcludedLetter is { } excluded ? $"--elevated-cleanup --letter {excluded}" : "--elevated-cleanup";
+        try { Process.Start(new ProcessStartInfo(Environment.ProcessPath!, cleanupArgs) { UseShellExecute = true, Verb = "runas" })?.WaitForExit(); }
         catch (System.ComponentModel.Win32Exception) { Log.Info("Selos não removidos do HKLM: UAC recusado"); }
         using (var run = Registry.CurrentUser.OpenSubKey(RunKey, writable: true))
             run?.DeleteValue(AppName, throwOnMissingValue: false);
