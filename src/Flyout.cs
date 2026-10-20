@@ -30,7 +30,7 @@ sealed class Flyout : Form
         BackColor = Color.FromArgb(0xF9, 0xF9, 0xF9);
         Controls.Add(_web);
         Deactivate += (_, _) => HidePanel();
-        Load += async (_, _) => await InitAsync();
+        Load += async (_, _) => { if (!await WebViewEnv.Run(this, InitAsync)) Close(); };
     }
 
     protected override CreateParams CreateParams
@@ -53,7 +53,7 @@ sealed class Flyout : Form
 
     async Task InitAsync()
     {
-        var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Paths.AppDir, "webview"));
+        var env = await WebViewEnv.Get();
         await _web.EnsureCoreWebView2Async(env);
         var core = _web.CoreWebView2;
         core.Settings.AreDevToolsEnabled = false;

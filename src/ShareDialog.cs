@@ -37,7 +37,7 @@ sealed class ShareDialog : Form
             ShellIntegration.CenterOnActiveScreen(this);
         };
         Controls.Add(_web);
-        Load += async (_, _) => await InitAsync();
+        Load += async (_, _) => { if (!await WebViewEnv.Run(this, InitAsync)) Close(); };
         Shown += (_, _) => { TopMost = false; Activate(); };
     }
 
@@ -45,7 +45,7 @@ sealed class ShareDialog : Form
 
     async Task InitAsync()
     {
-        var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Paths.AppDir, "webview"));
+        var env = await WebViewEnv.Get();
         await _web.EnsureCoreWebView2Async(env);
         var core = _web.CoreWebView2;
         core.Settings.AreDevToolsEnabled = false;

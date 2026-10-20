@@ -50,7 +50,7 @@ sealed class MainWindow : Form
     {
         try
         {
-            var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Paths.AppDir, "webview"));
+            var env = await WebViewEnv.Get();
             await _web.EnsureCoreWebView2Async(env);
         }
         catch (WebView2RuntimeNotFoundException)

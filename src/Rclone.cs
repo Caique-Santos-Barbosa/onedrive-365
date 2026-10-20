@@ -200,6 +200,7 @@ sealed class Rclone
             "--volname", Brand.Name,
             "--vfs-cache-mode", "full",          // baixa só o que é aberto, guarda em cache
             "--vfs-cache-max-size", "20G",
+            "--vfs-cache-min-free-space", "2G",  // o cache nunca deixa o disco com menos de 2 GB livres
             "--vfs-cache-max-age", "168h",
             "--cache-dir", Paths.CacheDir,
             "--dir-cache-time", "5m",            // listagens em memória; 5m cobre exclusões que o delta do Business não informa

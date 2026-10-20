@@ -32,7 +32,7 @@ index 47d23df..68031a8 100644
  	return 0
  }
 diff --git a/cmd/cmount/mount.go b/cmd/cmount/mount.go
-index 6515b33..2749fb6 100644
+index 6515b33..3e78585 100644
 --- a/cmd/cmount/mount.go
 +++ b/cmd/cmount/mount.go
 @@ -136,6 +136,7 @@ func mount(VFS *vfs.VFS, mountPath string, opt *mountlib.Options) (<-chan error,
@@ -43,12 +43,219 @@ index 6515b33..2749fb6 100644
  	host.SetCapReaddirPlus(true) // only works on Windows
  	if opt.CaseInsensitive.Valid {
  		host.SetCapCaseInsensitive(opt.CaseInsensitive.Value)
+@@ -160,6 +161,7 @@ func mount(VFS *vfs.VFS, mountPath string, opt *mountlib.Options) (<-chan error,
+ 			}
+ 		}()
+ 		var err error
++		setNotifyMount(mountpoint, fsys.VFS)
+ 		ok := host.Mount(mountpoint, options)
+ 		if !ok {
+ 			err = errors.New("mount failed")
+diff --git a/cmd/cmount/notify_other.go b/cmd/cmount/notify_other.go
+new file mode 100644
+index 0000000..779b889
+--- /dev/null
++++ b/cmd/cmount/notify_other.go
+@@ -0,0 +1,18 @@
++//go:build cmount && ((linux && cgo) || (darwin && cgo) || (freebsd && cgo) || (openbsd && cgo))
++
++package cmount
++
++import (
++	"errors"
++
++	"github.com/rclone/rclone/vfs"
++	"github.com/winfsp/cgofuse/fuse"
++)
++
++// setNotifyMount is only needed on Windows
++func setNotifyMount(mountpoint string, VFS *vfs.VFS) {}
++
++// nativeNotify is only implemented on Windows
++func nativeNotify(host *fuse.FileSystemHost, paths []string) (int, error) {
++	return 0, errors.New("not supported")
++}
+diff --git a/cmd/cmount/notify_windows.go b/cmd/cmount/notify_windows.go
+new file mode 100644
+index 0000000..6c6c3a2
+--- /dev/null
++++ b/cmd/cmount/notify_windows.go
+@@ -0,0 +1,169 @@
++//go:build cmount && windows
++
++package cmount
++
++import (
++	"errors"
++	"reflect"
++	"strings"
++	"sync"
++	"unsafe"
++
++	"github.com/rclone/rclone/vfs"
++	"github.com/winfsp/cgofuse/fuse"
++	"golang.org/x/sys/windows"
++)
++
++// WinFsp-FUSE uppercases the path in fuse_notify because it assumes the
++// file system doesn't report normalized names. cmount implements getpath,
++// so WinFsp registers directory watches under the real case of each name
++// and the uppercased notifications only ever match a watch on the root.
++// nativeNotify calls FspFileSystemNotify directly with the real case.
++
++var (
++	nativeMu         sync.Mutex
++	nativeMountpoint string
++	nativeVFS        *vfs.VFS
++	nativeFileSystem uintptr // FSP_FILE_SYSTEM *, found lazily
++
++	winfsp           = windows.NewLazyDLL("winfsp-x64.dll")
++	procNotifyBegin  = winfsp.NewProc("FspFileSystemNotifyBegin")
++	procNotify       = winfsp.NewProc("FspFileSystemNotify")
++	procNotifyEnd    = winfsp.NewProc("FspFileSystemNotifyEnd")
++	errNoFileSystem  = errors.New("winfsp file system not found")
++	errNotifyFailed  = errors.New("FspFileSystemNotify failed")
++)
++
++const (
++	fileNotifyChangeAttributes = 0x00000004
++	fileNotifyChangeSize       = 0x00000008
++	fileNotifyChangeLastWrite  = 0x00000010
++	fileActionModified         = 0x00000003
++)
++
++// setNotifyMount remembers the mount point and VFS for nativeNotify
++func setNotifyMount(mountpoint string, VFS *vfs.VFS) {
++	nativeMu.Lock()
++	defer nativeMu.Unlock()
++	nativeMountpoint = mountpoint
++	nativeVFS = VFS
++	nativeFileSystem = 0
++}
++
++// readMem reads n bytes at addr, failing instead of faulting on a bad address
++func readMem(addr uintptr, n int) ([]byte, bool) {
++	if addr == 0 || n <= 0 {
++		return nil, false
++	}
++	buf := make([]byte, n)
++	var done uintptr
++	err := windows.ReadProcessMemory(windows.CurrentProcess(), addr, &buf[0], uintptr(n), &done)
++	return buf, err == nil && int(done) == n
++}
++
++func readPtr(addr uintptr) (uintptr, bool) {
++	b, ok := readMem(addr, int(unsafe.Sizeof(uintptr(0))))
++	if !ok {
++		return 0, false
++	}
++	return *(*uintptr)(unsafe.Pointer(&b[0])), true
++}
++
++// readWide reads a NUL terminated UTF-16 string of at most max characters
++func readWide(addr uintptr, max int) (string, bool) {
++	b, ok := readMem(addr, max*2)
++	if !ok {
++		return "", false
++	}
++	u := unsafe.Slice((*uint16)(unsafe.Pointer(&b[0])), max)
++	for i, c := range u {
++		if c == 0 {
++			return windows.UTF16ToString(u[:i]), true
++		}
++	}
++	return "", false
++}
++
++// findFileSystem locates struct fuse::FileSystem: it follows MountPoint (PWSTR)
++// and LoopEvent (HANDLE), and is validated by the volume name it points to.
++func findFileSystem(host *fuse.FileSystemHost, mountpoint string) uintptr {
++	field := reflect.ValueOf(host).Elem().FieldByName("fuse")
++	if !field.IsValid() {
++		return 0
++	}
++	f := *(*uintptr)(unsafe.Pointer(field.UnsafeAddr()))
++	if f == 0 {
++		return 0
++	}
++	want := strings.TrimSuffix(strings.ToUpper(mountpoint), "\\")
++	for off := uintptr(0); off < 4096; off += 8 {
++		p, ok := readPtr(f + off)
++		if !ok || p < 0x10000 {
++			continue
++		}
++		s, ok := readWide(p, len(want)+1)
++		if !ok || strings.ToUpper(s) != want {
++			continue
++		}
++		fsp, ok := readPtr(f + off + 16) // MountPoint, LoopEvent, FileSystem
++		if !ok || fsp < 0x10000 {
++			continue
++		}
++		// FSP_FILE_SYSTEM: UINT16 Version; PVOID UserContext; WCHAR VolumeName[...]
++		name, ok := readWide(fsp+16, 256)
++		if ok && strings.HasPrefix(name, `\Device\`) {
++			return fsp
++		}
++	}
++	return 0
++}
++
++// nativeNotify reports a "modified" change (attributes, size, last write) for
++// each path, using the real case of the name as the directory watches do.
++func nativeNotify(host *fuse.FileSystemHost, paths []string) (int, error) {
++	if err := procNotify.Find(); err != nil {
++		return 0, err
++	}
++	nativeMu.Lock()
++	if nativeFileSystem == 0 {
++		nativeFileSystem = findFileSystem(host, nativeMountpoint)
++	}
++	fsp, VFS := nativeFileSystem, nativeVFS
++	nativeMu.Unlock()
++	if fsp == 0 {
++		return 0, errNoFileSystem
++	}
++	// FspFileSystemNotifyBegin returns STATUS_CANT_WAIT while a rename is in progress
++	for i := 0; ; i++ {
++		r, _, _ := procNotifyBegin.Call(fsp, 1000)
++		if r == 0 {
++			break
++		}
++		if i == 2 {
++			return 0, errNotifyFailed
++		}
++	}
++	defer func() { _, _, _ = procNotifyEnd.Call(fsp) }()
++	sent := 0
++	for _, p := range paths {
++		if VFS != nil {
++			if node, err := VFS.Stat(p); err == nil {
++				p = node.Path() // real case from the remote listing
++			}
++		}
++		name := windows.StringToUTF16(`\` + strings.ReplaceAll(p, "/", `\`))
++		name = name[:len(name)-1] // drop the NUL
++		// FSP_FSCTL_NOTIFY_INFO: UINT16 Size; UINT32 Filter; UINT32 Action; WCHAR FileNameBuf[]
++		size := 12 + 2*len(name)
++		buf := make([]byte, (size+7)&^7)
++		*(*uint16)(unsafe.Pointer(&buf[0])) = uint16(size)
++		*(*uint32)(unsafe.Pointer(&buf[4])) = fileNotifyChangeAttributes | fileNotifyChangeSize | fileNotifyChangeLastWrite
++		*(*uint32)(unsafe.Pointer(&buf[8])) = fileActionModified
++		copy(unsafe.Slice((*uint16)(unsafe.Pointer(&buf[12])), len(name)), name)
++		r, _, _ := procNotify.Call(fsp, uintptr(unsafe.Pointer(&buf[0])), uintptr(size))
++		if r == 0 {
++			sent++
++		}
++	}
++	return sent, nil
++}
 diff --git a/cmd/cmount/winflags.go b/cmd/cmount/winflags.go
 new file mode 100644
-index 0000000..7b97fbd
+index 0000000..4ac5c8b
 --- /dev/null
 +++ b/cmd/cmount/winflags.go
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,174 @@
 +//go:build cmount && ((linux && cgo) || (darwin && cgo) || (freebsd && cgo) || (openbsd && cgo) || windows)
 +
 +package cmount
@@ -118,17 +325,23 @@ index 0000000..7b97fbd
 +	if host == nil {
 +		return nil, errors.New("not mounted")
 +	}
-+	sent := 0
++	var paths []string
 +	for _, p := range strings.Split(list, "|") {
 +		p = strings.Trim(strings.ReplaceAll(strings.TrimSpace(p), "\\", "/"), "/")
-+		if p == "" {
-+			continue
++		if p != "" {
++			paths = append(paths, p)
 +		}
++	}
++	if sent, err := nativeNotify(host, paths); err == nil {
++		return rc.Params{"sent": sent, "native": true}, nil
++	}
++	sent := 0
++	for _, p := range paths {
 +		if host.Notify("/"+p, fuse.NOTIFY_CHMOD|fuse.NOTIFY_CHFLAGS|fuse.NOTIFY_UTIME|fuse.NOTIFY_TRUNCATE) {
 +			sent++
 +		}
 +	}
-+	return rc.Params{"sent": sent}, nil
++	return rc.Params{"sent": sent, "native": false}, nil
 +}
 +
 +// rcIconDirs replaces the folder list with the "dirs" parameter
@@ -193,16 +406,21 @@ index 0000000..7b97fbd
 +	return iconDirs, iconParents
 +}
 +
++// isIconDir reports whether dir gets the read-only flag for desktop.ini
++func isIconDir(node vfs.Node) bool {
++	dirs, parents := currentIconDirs()
++	p := strings.ToLower(strings.Trim(node.Path(), "/"))
++	parent := ""
++	if i := strings.LastIndex(p, "/"); i >= 0 {
++		parent = p[:i]
++	}
++	return dirs[p] || (p != "" && parents[parent])
++}
++
 +// winFlags returns the BSD (Windows attribute) flags for node
 +func winFlags(node vfs.Node) uint32 {
 +	if node.IsDir() {
-+		dirs, parents := currentIconDirs()
-+		p := strings.ToLower(strings.Trim(node.Path(), "/"))
-+		parent := ""
-+		if i := strings.LastIndex(p, "/"); i >= 0 {
-+			parent = p[:i]
-+		}
-+		if dirs[p] || (p != "" && parents[parent]) {
++		if isIconDir(node) {
 +			return fuse.UF_READONLY
 +		}
 +		return 0
