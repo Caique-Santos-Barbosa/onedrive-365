@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #F9F9F9; --surface: #FFFFFF; --ink: #1B1B1B; --soft: #5D5D5D; --line: #E5E5E5; --hover: rgba(0,0,0,.045);
+    --accent: #0F6CBD; --ok: #0E7A0D; --error: #C42B1C;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #2B2B2B; --surface: #323232; --ink: #FFFFFF; --soft: #C5C5C5; --line: #3D3D3D; --hover: rgba(255,255,255,.06);
+            --accent: #60CDFF; --ok: #6CCB5F; --error: #FF99A4; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.4 "Segoe UI Variable Text", "Segoe UI", sans-serif; user-select: none; display: flex; flex-direction: column; overflow: hidden; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  svg { width: 20px; height: 20px; flex: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+
+  header { padding: 16px 16px 10px 20px; }
+  .top { display: flex; align-items: center; gap: 10px; }
+  .top img { width: 24px; height: 24px; }
+  .top h1 { font: 600 16px "Segoe UI Variable Display", "Segoe UI", sans-serif; margin: 0; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gear { width: 36px; height: 36px; border-radius: 6px; display: grid; place-items: center; }
+  .gear:hover, .gear[aria-expanded="true"] { background: var(--hover); }
+  .status { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--soft); }
+  .status .dot { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; color: #fff; flex: none; }
+  .status .dot svg { width: 10px; height: 10px; }
+  .dot.ok { background: var(--ok); } .dot.sync { background: var(--accent); } .dot.error { background: var(--error); } .dot.paused { background: var(--soft); }
+  .dot.sync svg { animation: spin 1.3s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .dot.sync svg { animation: none; } }
+  .bar { height: 3px; border-radius: 2px; background: var(--line); margin-top: 8px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+
+  main { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 4px 8px; }
+  .item { display: flex; gap: 14px; align-items: flex-start; padding: 10px 12px; border-radius: 6px; cursor: default; }
+  .item:hover { background: var(--hover); }
+  .item img { width: 40px; height: 40px; flex: none; object-fit: contain; }
+  .item .t { min-width: 0; flex: 1; }
+  .item .n { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .w { font-size: 13px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .w a { color: var(--accent); text-decoration: none; cursor: pointer; }
+  .item .w a:hover { text-decoration: underline; }
+  .item .w.err { color: var(--error); }
+  .item small { font-size: 12px; color: var(--soft); }
+  .empty { text-align: center; color: var(--soft); padding: 60px 24px; }
+  .empty img { width: 64px; height: 64px; opacity: .9; }
+  .empty b { display: block; color: var(--ink); margin: 10px 0 4px; font-weight: 600; }
+
+  footer { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); padding: 8px; }
+  footer button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; border-radius: 6px; font-size: 13px; }
+  footer button:hover { background: var(--hover); }
+
+  .menu { position: absolute; right: 14px; top: 54px; min-width: 250px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 4px; display: none; z-index: 5; }
+  .menu.open { display: block; }
+  .menu button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px; border-radius: 4px; text-align: left; }
+  .menu button:hover { background: var(--hover); }
+  .menu .chev { margin-left: auto; width: 14px; height: 14px; transition: transform .15s; }
+  .menu .sub { display: none; padding-left: 32px; }
+  .menu .sub.open { display: block; }
+  .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-gear" viewBox="0 0 20 20"><path d="M8.6 2.6h2.8l.4 2a5.6 5.6 0 0 1 1.5.9l1.9-.7 1.4 2.4-1.5 1.3a5.7 5.7 0 0 1 0 1.8l1.5 1.3-1.4 2.4-1.9-.7a5.6 5.6 0 0 1-1.5.9l-.4 2H8.6l-.4-2a5.6 5.6 0 0 1-1.5-.9l-1.9.7-1.4-2.4 1.5-1.3a5.7 5.7 0 0 1 0-1.8L3.4 7.2l1.4-2.4 1.9.7a5.6 5.6 0 0 1 1.5-.9z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.3" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="m4.5 10.5 3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 20 20"><path d="M15.5 8A6 6 0 0 0 4.6 6.5M4.5 12a6 6 0 0 0 10.9 1.5M15.5 3.5V8H11M4.5 16.5V12H9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><path d="M7.5 5v10M12.5 5v10" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-pauseo" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v6M12 7v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 7v6l5-3z" fill="currentColor"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><ellipse cx="10" cy="10" rx="3.2" ry="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 10h15" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4 5.5h12M8 5.5V4h4v1.5M5.5 5.5l.8 11a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-11M8.5 8.5v6M11.5 8.5v6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-help" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 8a2 2 0 1 1 3 1.7c-.7.4-1 .9-1 1.6M10 14v.1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-unlink" viewBox="0 0 20 20"><path d="M8.5 11.5l3-3M7 9l-2 2a2.8 2.8 0 0 0 4 4l2-2M13 11l2-2a2.8 2.8 0 0 0-4-4L9 7M3.5 3.5l13 13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-person" viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 16.5c.8-3 3.2-4.5 6-4.5s5.2 1.5 6 4.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header>
+  <div class="top">
+    <img id="cloud" alt="">
+    <h1 id="title">OneDrive 365</h1>
+    <button class="gear" id="gear" title="Ajuda e configurações" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-gear"/></svg></button>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="bar" id="bar" hidden><i id="barFill"></i></div>
+</header>
+
+<div class="menu" id="menu" role="menu">
+  <button data-cmd="settings" role="menuitem"><svg><use href="#i-gear"/></svg>Configurações</button>
+  <button data-cmd="help" role="menuitem"><svg><use href="#i-help"/></svg>Obter ajuda</button>
+  <button id="pauseToggle" role="menuitem" aria-expanded="false"><svg id="pauseIcon"><use href="#i-pauseo"/></svg><span id="pauseLabel">Pausar sincronização</span><svg class="chev"><use href="#i-chev"/></svg></button>
+  <div class="sub" id="pauseSub">
+    <button data-pause="2" role="menuitem">2 horas</button>
+    <button data-pause="8" role="menuitem">8 horas</button>
+    <button data-pause="24" role="menuitem">24 horas</button>
+  </div>
+  <hr>
+  <button id="accountItem" data-cmd="signOut" role="menuitem"><svg id="accountIcon"><use href="#i-unlink"/></svg><span id="accountLabel">Desvincular este PC</span></button>
+  <button data-cmd="quit" role="menuitem"><svg><use href="#i-close"/></svg>Sair do OneDrive 365</button>
+</div>
+
+<main id="list"></main>
+
+<footer>
+  <button data-cmd="openDrive"><svg><use href="#i-folder"/></svg>Abrir pasta</button>
+  <button data-cmd="openWeb"><svg><use href="#i-globe"/></svg>Ver online</button>
+  <button data-cmd="recycle"><svg><use href="#i-trash"/></svg>Lixeira</button>
+</footer>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const send = (cmd, args = {}) => chrome.webview.postMessage({ cmd, ...args });
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  let S = null;
+
+  function ago(iso) {
+    if (!iso) return "";
+    const s = Math.round((Date.now() - new Date(iso)) / 1000);
+    if (s < 60) return `há ${Math.max(1, s)} segundo${s === 1 ? "" : "s"}`;
+    const m = Math.round(s / 60);
+    if (m < 60) return `há ${m} minuto${m === 1 ? "" : "s"}`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `há ${h} hora${h === 1 ? "" : "s"}`;
+    return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  }
+  function size(b) {
+    if (b == null) return "";
+    if (b >= 1 << 30) return (b / (1 << 30)).toFixed(1).replace(".", ",") + " GB";
+    if (b >= 1 << 20) return Math.round(b / (1 << 20)) + " MB";
+    return Math.max(1, Math.round(b / 1024)) + " KB";
+  }
+  function folderName(where) {
+    const w = (where || "").split(" → ")[0];
+    return w.split("\\").filter(Boolean).pop() || w;
+  }
+
+  function render() {
+    $("#cloud").src = S.cloudIcon;
+    $("#title").textContent = S.org ? `OneDrive 365 - ${S.org}` : "OneDrive 365";
+    const st = S.status, p = S.backupProgress;
+    const icon = { ok: "check", sync: "sync", error: "x", paused: "pause" }[st.kind] || "check";
+    let text = st.kind === "ok" ? (S.folders.some((f) => f.enabled) ? "Incluído no backup e sincronizado" : "Seus arquivos estão sincronizados")
+      : st.kind === "paused" ? (S.pausedUntil ? `Sincronização pausada até ${new Date(S.pausedUntil).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Sincronização pausada")
+      : st.title;
+    if (st.kind === "sync" && p && p.totalFiles) text = `Enviando ${p.files.toLocaleString("pt-BR")} de ${p.totalFiles.toLocaleString("pt-BR")} arquivos (${size(p.bytes)} de ${size(p.totalBytes)})`;
+    $("#status").innerHTML = `<span class="dot ${st.kind}"><svg><use href="#i-${icon}"/></svg></span><span>${esc(text)}</span>`;
+    $("#bar").hidden = !(st.kind === "sync" && p && p.totalBytes);
+    if (p && p.totalBytes) $("#barFill").style.width = Math.min(100, (p.bytes / p.totalBytes) * 100).toFixed(1) + "%";
+
+    // Desconectado: o item vira "Entrar"; conectado: "Desvincular este PC" (mesmo nome do OneDrive)
+    $("#accountItem").dataset.cmd = S.signedOut ? "signIn" : "signOut";
+    $("#accountLabel").textContent = S.signedOut ? "Entrar no OneDrive 365" : "Desvincular este PC";
+    $("#accountIcon").innerHTML = `<use href="#i-${S.signedOut ? "person" : "unlink"}"/>`;
+    $("#pauseLabel").textContent = S.paused ? "Retomar sincronização" : "Pausar sincronização";
+    $("#pauseIcon").innerHTML = `<use href="#i-${S.paused ? "play" : "pauseo"}"/>`;
+
+    const sending = (p?.transferring || []).map((t) => ({ name: t.name, where: t.where, size: t.size, status: "uploading", percent: t.percent }));
+    const items = sending.concat(S.activity).slice(0, 60);
+    if (!items.length) {
+      $("#list").innerHTML = `<div class="empty"><img src="${S.cloudIcon}" alt=""><b>Tudo em dia</b>Os arquivos que você salvar ou enviar para o OneDrive aparecem aqui.</div>`;
+      return;
+    }
+    $("#list").innerHTML = items.map((x) => {
+      const ext = (x.name.split(".").pop() || "").toLowerCase();
+      const img = S.fileIcons[ext] || S.fileIcons[""] || "";
+      const folder = folderName(x.where);
+      const line = x.status === "uploading" ? `Enviando para <a data-open="${esc(x.where)}">${esc(folder)}</a> ${x.percent ?? 0}%`
+        : x.status === "error" ? `<span class="err">Não foi possível enviar</span>`
+        : `Disponível em <a data-reveal="${esc(x.path || "")}">${esc(folder)}</a>`;
+      return `<div class="item" data-file="${esc(x.path || "")}" title="${esc(x.where + "\\" + x.name)}">
+        <img src="${img}" alt="">
+        <div class="t"><div class="n">${esc(x.name)}</div><div class="w ${x.status === "error" ? "err" : ""}">${line}</div><small>${x.status === "uploading" ? size(x.size) : esc(ago(x.time))}</small></div>
+      </div>`;
+    }).join("");
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.closest("#gear")) { const open = !$("#menu").classList.contains("open"); $("#menu").classList.toggle("open", open); $("#gear").setAttribute("aria-expanded", open); return; }
+    if (t.closest("#pauseToggle")) {
+      if (S.paused) { send("pause", { hours: 0 }); closeMenu(); return; }
+      $("#pauseSub").classList.toggle("open"); return;
+    }
+    const pause = t.closest("[data-pause]"); if (pause) { send("pause", { hours: +pause.dataset.pause }); closeMenu(); return; }
+    const cmd = t.closest("[data-cmd]"); if (cmd) { closeMenu(); send(cmd.dataset.cmd); return; }
+    const rev = t.closest("[data-reveal]"); if (rev) { send("reveal", { path: rev.dataset.reveal }); return; }
+    const open = t.closest("[data-open]"); if (open) { send("openWhere", { where: open.dataset.open }); return; }
+    if (!t.closest(".menu")) closeMenu();
+  });
+  document.addEventListener("dblclick", (e) => { const f = e.target.closest("[data-file]"); if (f && f.dataset.file) send("openFile", { path: f.dataset.file }); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") send("hide"); });
+  function closeMenu() { $("#menu").classList.remove("open"); $("#pauseSub").classList.remove("open"); $("#gear").setAttribute("aria-expanded", "false"); }
+
+  chrome.webview.addEventListener("message", (e) => {
+    if (e.data.type === "state") { S = e.data.state; render(); }
+    if (e.data.type === "shown") { closeMenu(); $("#list").scrollTop = 0; }
+  });
+  setInterval(() => S && render(), 30000);
+  send("ready");
+</script>
+</body>
+</html>

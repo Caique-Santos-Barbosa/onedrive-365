@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OneDrive 365</title>
+<style>
+  :root {
+    --bg: #F3F5F8;
+    --surface: #FFFFFF;
+    --surface-2: #F7F9FB;
+    --ink: #1B1F24;
+    --ink-soft: #5B6573;
+    --line: #E3E7EC;
+    --accent: #0F6CBD;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E6F0FA;
+    --ok: #0E7A0D;
+    --warn: #9D5D00;
+    --error: #B3261E;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1C1E21; --surface: #26292D; --surface-2: #2C2F34; --ink: #ECEFF3; --ink-soft: #A7B0BC;
+      --line: #393D43; --accent: #4CA3F0; --accent-ink: #0B1B2B; --accent-soft: #23374B;
+      --ok: #57B957; --warn: #E2A33A; --error: #F1707B; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    display: grid; grid-template-columns: 248px 1fr; grid-template-rows: 64px 1fr;
+    user-select: none; overflow: hidden;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  svg { width: 20px; height: 20px; flex: none; }
+
+  /* Topo */
+  .brand { display: flex; align-items: center; gap: 10px; padding-left: 22px; font: 600 17px "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+  .brand img { width: 28px; height: 28px; }
+  header { display: flex; align-items: center; gap: 8px; padding: 0 16px 0 8px; }
+  .search { flex: 1; max-width: 640px; position: relative; margin-right: auto; }
+  .search input {
+    width: 100%; height: 40px; border-radius: 20px; border: 1px solid transparent; background: var(--surface);
+    padding: 0 16px 0 42px; box-shadow: var(--shadow); outline: none;
+  }
+  .search input:focus { border-color: var(--accent); }
+  .search > svg { position: absolute; left: 14px; top: 10px; color: var(--ink-soft); }
+  .spacer { flex: 1; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 20px; border: 0; background: transparent; display: grid; place-items: center; color: var(--ink-soft); }
+  .icon-btn:hover { background: var(--surface); color: var(--ink); }
+  .icon-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .avatar { width: 36px; height: 36px; flex: none; aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 600; }
+  .avatar-img { width: 100%; height: 100%; display: block; object-fit: cover; border-radius: 50%; }
+  .account-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 22px; padding: 3px 3px 3px 12px; display: flex; align-items: center; gap: 10px; }
+  .account-btn span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+
+  /* Lateral */
+  nav { padding: 8px 12px 16px; display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+  .open-drive {
+    display: flex; align-items: center; gap: 10px; margin: 4px 4px 14px; padding: 12px 16px; border: 0; border-radius: 12px;
+    background: var(--accent); color: var(--accent-ink); font-weight: 600; box-shadow: var(--shadow); text-align: left;
+  }
+  .open-drive:hover { filter: brightness(1.06); }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 8px; border: 0; background: transparent; text-align: left; color: var(--ink); }
+  .nav-item:hover { background: var(--surface); }
+  .nav-item[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .nav-item .count { margin-left: auto; min-width: 20px; padding: 0 6px; border-radius: 10px; background: var(--error); color: #fff; font-size: 12px; text-align: center; }
+  .storage { margin-top: auto; padding: 14px; font-size: 12.5px; color: var(--ink-soft); }
+  .bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin: 6px 0; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+
+  /* Conteúdo */
+  main { overflow-y: auto; overflow-x: hidden; padding: 4px 24px 24px 8px; min-width: 0; }
+  .card { min-width: 0; }
+  .page { display: none; }
+  .page.active { display: block; }
+  h1 { font: 600 26px/1.2 "Segoe UI Variable Display", "Segoe UI", sans-serif; margin: 10px 0 4px; letter-spacing: -0.01em; }
+  h2 { font: 600 16px "Segoe UI Variable Display", "Segoe UI", sans-serif; margin: 0 0 4px; }
+  .muted { color: var(--ink-soft); }
+  .lead { color: var(--ink-soft); margin: 0 0 18px; max-width: 70ch; }
+  .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 22px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .grid .wide { grid-column: 1 / -1; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--line); background: var(--surface); color: var(--accent); font-weight: 600; }
+  .btn:hover { background: var(--accent-soft); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.danger { color: var(--error); }
+  .btn svg { width: 16px; height: 16px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .link { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; }
+
+  /* Status (o destaque da página) */
+  .status { display: flex; gap: 20px; align-items: center; padding: 24px 26px; }
+  .status-mark { position: relative; width: 64px; height: 64px; flex: none; }
+  .status-mark img { width: 64px; height: 64px; }
+  .status-mark .badge { position: absolute; right: -6px; bottom: -4px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; border: 3px solid var(--surface); }
+  .status-mark .badge svg { width: 14px; height: 14px; }
+  .badge.ok { background: var(--ok); } .badge.sync { background: var(--accent); } .badge.error { background: var(--error); } .badge.paused { background: var(--ink-soft); }
+  .badge.sync svg { animation: spin 1.4s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .badge.sync svg { animation: none; } }
+  .status h1 { margin: 0; }
+
+  /* Listas */
+  .rows { display: flex; flex-direction: column; }
+  .row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .row img.ico { width: 32px; height: 32px; }
+  .row .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .sub { color: var(--ink-soft); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .sub.error { color: var(--error); }
+  .row .side { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12.5px; }
+  .chip img { width: 16px; height: 16px; }
+
+  /* Interruptor */
+  .switch { position: relative; width: 40px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; position: absolute; cursor: pointer; z-index: 1; }
+  .switch span { position: absolute; inset: 0; border-radius: 11px; border: 1px solid var(--ink-soft); background: transparent; transition: background .15s; }
+  .switch span::after { content: ""; position: absolute; width: 12px; height: 12px; left: 4px; top: 4px; border-radius: 50%; background: var(--ink-soft); transition: transform .15s; }
+  .switch input:checked + span { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + span::after { background: var(--accent-ink); transform: translateX(18px); }
+  .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Tabela de atividade */
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  col.c-size { width: 84px; } col.c-status { width: 150px; } col.c-act { width: 44px; }
+  th { text-align: left; font-weight: 600; font-size: 12.5px; color: var(--ink-soft); padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  td { overflow: hidden; }
+  .file { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .file > div { min-width: 0; flex: 1; }
+  .file .n, .file .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file .p { color: var(--ink-soft); font-size: 12px; }
+  td.num { color: var(--ink-soft); text-align: right; padding-right: 14px; white-space: nowrap; }
+  .when { display: block; color: var(--ink-soft); font-size: 12px; }
+  .reveal { width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; color: var(--accent); display: grid; place-items: center; cursor: pointer; }
+  .reveal:hover { background: var(--accent-soft); }
+  .reveal svg { width: 18px; height: 18px; }
+  .state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .state.ok { color: var(--ok); } .state.sync { color: var(--accent); } .state.error { color: var(--error); }
+  .state svg { width: 16px; height: 16px; }
+  h1 .state svg { width: 26px; height: 26px; }
+
+  .progress { margin-top: 18px; padding: 16px 18px; border-radius: 10px; background: var(--accent-soft); }
+  .progress .bar { height: 6px; margin: 10px 0 8px; background: var(--surface); }
+  .progress .top { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; }
+  .progress .nums { color: var(--ink-soft); font-size: 13px; }
+  .empty { text-align: center; padding: 56px 20px; color: var(--ink-soft); }
+  .empty svg { width: 48px; height: 48px; color: var(--accent); margin-bottom: 10px; }
+  .empty h2 { color: var(--ink); }
+
+  /* Popovers */
+  .popover { position: fixed; z-index: 10; background: var(--surface); border-radius: 14px; box-shadow: 0 12px 32px rgba(16, 24, 40, .18); border: 1px solid var(--line); display: none; }
+  .popover.open { display: block; }
+  #menu { top: 56px; right: 70px; min-width: 240px; padding: 6px; }
+  #menu button { display: flex; width: 100%; align-items: center; gap: 12px; padding: 9px 12px; border: 0; border-radius: 8px; background: none; text-align: left; }
+  #menu button:hover { background: var(--surface-2); }
+  #menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+  #account { top: 56px; right: 16px; width: 340px; padding: 22px; text-align: center; }
+  #account .avatar { width: 72px; height: 72px; margin: 0 auto 10px; font-size: 26px; }
+  #account .usage { text-align: left; background: var(--surface-2); border-radius: 12px; padding: 12px 14px; margin: 16px 0 12px; font-size: 13px; }
+  #results { top: 56px; left: 240px; width: min(560px, calc(100vw - 260px)); max-height: 60vh; overflow: auto; padding: 6px; }
+  #results button { display: grid; grid-template-columns: 24px 1fr; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: none; text-align: left; align-items: center; }
+  #results button:hover { background: var(--surface-2); }
+  #results .p { color: var(--ink-soft); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #results .msg { padding: 14px; color: var(--ink-soft); }
+  .scrim { position: fixed; inset: 0; z-index: 5; display: none; }
+
+  /* Escolher pastas (⚙ de cada pasta do computador) */
+  .modal-back { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.32); display: none; place-items: center; }
+  .modal-back.open { display: grid; }
+  .modal { width: min(620px, calc(100vw - 48px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column; background: var(--surface); border-radius: 12px; box-shadow: 0 24px 48px rgba(0,0,0,.24); }
+  .modal header { display: block; padding: 22px 24px 8px; }
+  .modal h2 { font-size: 20px; margin: 0 0 4px; }
+  .modal .tree { flex: 1; overflow: auto; margin: 8px 24px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 0; min-height: 200px; }
+  .modal .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 24px 20px; }
+  .node { display: flex; align-items: center; gap: 6px; padding: 4px 10px; white-space: nowrap; }
+  .node:hover { background: var(--surface-2); }
+  .node .tw { width: 22px; height: 22px; border: 0; background: none; color: var(--ink-soft); cursor: pointer; display: grid; place-items: center; border-radius: 4px; flex: none; }
+  .node .tw svg { width: 14px; height: 14px; transition: transform .12s; }
+  .node .tw.open svg { transform: rotate(90deg); }
+  .node .tw.none { visibility: hidden; }
+  .node input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0 4px 0 0; flex: none; }
+  .node svg.f { width: 18px; height: 18px; color: #E8B33C; }
+  .node .nm { overflow: hidden; text-overflow: ellipsis; }
+  .node.off .nm { color: var(--ink-soft); }
+  .timeinp { height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; background: var(--surface); color: var(--ink); font: inherit; }
+  .icon-only { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 17px; }
+  .scrim.open { display: block; }
+
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } body { grid-template-columns: 210px 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- Ícones (traço, no estilo Fluent) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.5 12.5 17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v6M12 7v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 7v6l5-3z" fill="currentColor"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><path d="M8.6 2.6h2.8l.4 2a5.6 5.6 0 0 1 1.5.9l1.9-.7 1.4 2.4-1.5 1.3a5.7 5.7 0 0 1 0 1.8l1.5 1.3-1.4 2.4-1.9-.7a5.6 5.6 0 0 1-1.5.9l-.4 2H8.6l-.4-2a5.6 5.6 0 0 1-1.5-.9l-1.9.7-1.4-2.4 1.5-1.3a5.7 5.7 0 0 1 0-1.8L3.4 7.2l1.4-2.4 1.9.7a5.6 5.6 0 0 1 1.5-.9z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-home" viewBox="0 0 20 20"><path d="M3.5 9 10 3.5 16.5 9v7a1 1 0 0 1-1 1h-3v-5h-5v5h-3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 20 20"><path d="M15.5 8A6 6 0 0 0 4.6 6.5M4.5 12a6 6 0 0 0 10.9 1.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15.5 3.5V8H11M4.5 16.5V12H9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5 13.5V9a5 5 0 0 1 10 0v4.5l1.5 1.5h-13zM8 17a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pc" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 17h6M10 13.5V17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <!-- Logo do SharePoint em uma cor: três círculos (cada um com fresta para o que está à frente) e quadrado com "S" vazado -->
+  <mask id="sp-top" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+    <rect width="20" height="20" fill="#fff"/>
+    <circle cx="14.6" cy="11.3" r="5.2" fill="#000"/><circle cx="11.2" cy="15.7" r="4.4" fill="#000"/>
+    <rect x="0.3" y="3.8" width="12.4" height="12.4" rx="2.6" fill="#000"/>
+  </mask>
+  <mask id="sp-right" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+    <rect width="20" height="20" fill="#fff"/>
+    <circle cx="11.2" cy="15.7" r="4.4" fill="#000"/>
+    <rect x="0.3" y="3.8" width="12.4" height="12.4" rx="2.6" fill="#000"/>
+  </mask>
+  <mask id="sp-bottom" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+    <rect width="20" height="20" fill="#fff"/><rect x="0.3" y="3.8" width="12.4" height="12.4" rx="2.6" fill="#000"/>
+  </mask>
+  <mask id="sp-s" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+    <rect width="20" height="20" fill="#fff"/>
+    <path d="M8.5 7.7C8 7.1 7.3 6.85 6.55 6.85 5.45 6.85 4.7 7.4 4.7 8.25c0 1.85 3.9 1.15 3.9 3.45 0 .95-.85 1.5-2.05 1.5-.9 0-1.7-.3-2.25-.95" fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>
+  </mask>
+  <symbol id="i-sharepoint" viewBox="0 0 20 20">
+    <g fill="currentColor" transform="translate(1.3 1.1) scale(0.87)">
+      <circle cx="11.6" cy="6.2" r="5.2" mask="url(#sp-top)"/>
+      <circle cx="14.6" cy="11.3" r="4.4" mask="url(#sp-right)"/>
+      <circle cx="11.2" cy="15.7" r="3.6" mask="url(#sp-bottom)"/>
+      <rect x="1.4" y="4.9" width="10.2" height="10.2" rx="1.7" mask="url(#sp-s)"/>
+    </g>
+  </symbol>
+  <!-- Pastas do computador: pasta com a "porta" do Explorador na frente (fresta recortada da pasta) -->
+  <mask id="fx-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+    <rect width="20" height="20" fill="#fff"/><rect x="4.1" y="10.7" width="11.8" height="8" rx="1" fill="#000"/>
+  </mask>
+  <symbol id="i-explorer" viewBox="0 0 20 20">
+    <path fill="currentColor" mask="url(#fx-gap)" d="M1.4 4.2a1.3 1.3 0 0 1 1.3-1.3h5.6a1.3 1.3 0 0 1 .9.4l1.3 1.3h7.1a1.3 1.3 0 0 1 1.3 1.3v9.9a1.3 1.3 0 0 1-1.3 1.3H2.7a1.3 1.3 0 0 1-1.3-1.3z"/>
+    <path fill="currentColor" d="M4.6 11.8a.7.7 0 0 1 .7-.7h9.4a.7.7 0 0 1 .7.7v5.2a.5.5 0 0 1-.5.5h-1.8a.5.5 0 0 1-.5-.5v-2.6H7.4V17a.5.5 0 0 1-.5.5H5.1a.5.5 0 0 1-.5-.5z"/>
+  </symbol>
+  <symbol id="i-sites" viewBox="0 0 20 20"><rect x="3" y="3" width="6" height="6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-open" viewBox="0 0 20 20"><path d="M11 3.5h5.5V9M16.5 3.5 9.5 10.5M14 12v3.5a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1H8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="m4.5 10.5 3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 20 20"><path d="M10 3 18 17H2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v4M10 14.5v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6.5v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-signout" viewBox="0 0 20 20"><path d="M8 4H4.5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1H8M12 6.5 15.5 10 12 13.5M15.5 10H7.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-file" viewBox="0 0 20 20"><path d="M5 2.5h6.5l4 4V17a.5.5 0 0 1-.5.5H5a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5z M11.5 2.5V6.5h4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chevr" viewBox="0 0 20 20"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-folderfill" viewBox="0 0 20 20"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4l2 2h7A1.5 1.5 0 0 1 18 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5z" fill="currentColor"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 20 20"><path d="M6 15.5a3.5 3.5 0 0 1-.4-7A4.5 4.5 0 0 1 14.3 8a3.8 3.8 0 0 1 .2 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="brand"><img id="brandIcon" alt=""><span>OneDrive 365</span></div>
+<header>
+  <form class="search" id="searchForm" role="search">
+    <svg><use href="#i-search"/></svg>
+    <input id="q" type="search" placeholder="Pesquisar no OneDrive" aria-label="Pesquisar no OneDrive" autocomplete="off">
+  </form>
+  <button class="icon-btn" id="pauseBtn" title="Pausar backup" aria-pressed="false"><svg><use href="#i-pause"/></svg></button>
+  <button class="icon-btn" id="gearBtn" title="Configurações" aria-haspopup="menu"><svg><use href="#i-gear"/></svg></button>
+  <button class="account-btn" id="accountBtn" title="Conta"><span id="accountShort"></span><div class="avatar" id="avatarSmall"></div></button>
+</header>
+
+<nav aria-label="Seções">
+  <button class="open-drive" data-cmd="openDrive"><svg><use href="#i-folder"/></svg><span id="openDriveLabel">Abrir OneDrive 365</span></button>
+  <button class="nav-item" data-page="home"><svg><use href="#i-home"/></svg>Início</button>
+  <button class="nav-item" data-page="activity"><svg><use href="#i-sync"/></svg>Atividade</button>
+  <button class="nav-item" data-page="notifications"><svg><use href="#i-bell"/></svg>Notificações<span class="count" id="notifCount" hidden></span></button>
+  <button class="nav-item" data-page="folders"><svg><use href="#i-explorer"/></svg>Pastas do computador</button>
+  <button class="nav-item" data-page="sharepoint"><svg><use href="#i-sharepoint"/></svg>SharePoint</button>
+  <div class="storage" id="storageBox" hidden>
+    <div id="storageText"></div>
+    <div class="bar"><i id="storageBar"></i></div>
+  </div>
+</nav>
+
+<main>
+  <!-- Início -->
+  <section class="page" id="page-home">
+    <div class="grid">
+      <div class="card status wide">
+        <div class="status-mark"><img id="statusCloud" alt=""><span class="badge ok" id="statusBadge"><svg><use href="#i-check"/></svg></span></div>
+        <div>
+          <h1 id="statusTitle">Tudo atualizado</h1>
+          <div class="muted" id="statusSub"></div>
+          <div class="actions"><button class="btn" data-page="activity">Ver atividade</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Pastas do computador</h2>
+        <div class="muted" id="foldersSummary"></div>
+        <div class="chips" id="foldersChips"></div>
+        <div class="actions"><button class="btn" data-page="folders">Gerenciar pastas</button></div>
+      </div>
+      <div class="card">
+        <h2>SharePoint</h2>
+        <div class="muted" id="spSummary"></div>
+        <div class="actions"><button class="btn" data-page="sharepoint">Gerenciar bibliotecas</button></div>
+      </div>
+      <div class="card" id="homeNotice">
+        <h2 id="noticeTitle">Tudo em dia</h2>
+        <div class="muted" id="noticeText">Quando algo precisar da sua atenção, aparece aqui.</div>
+        <div class="actions" id="noticeActions" hidden><button class="btn" data-page="notifications">Ver notificações</button></div>
+      </div>
+      <div class="card">
+        <h2>Links rápidos</h2>
+        <div class="actions">
+          <button class="btn" data-cmd="addFolder"><svg><use href="#i-plus"/></svg>Adicionar pasta</button>
+          <button class="btn" data-cmd="openWeb"><svg><use href="#i-open"/></svg>OneDrive na web</button>
+          <button class="btn" data-cmd="openDrive"><svg><use href="#i-folder"/></svg><span class="driveLetter"></span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Atividade -->
+  <section class="page" id="page-activity">
+    <div class="card">
+      <h1 style="display:flex;align-items:center;gap:12px"><span class="state" id="actState"></span><span id="actTitle">Atualizado</span></h1>
+      <div class="muted" id="actSub"></div>
+      <div id="actBody" style="margin-top:16px"></div>
+    </div>
+  </section>
+
+  <!-- Notificações -->
+  <section class="page" id="page-notifications">
+    <h1>Notificações</h1>
+    <p class="lead">Problemas de envio, backup ou conexão que precisam de você.</p>
+    <div class="card" id="notifBody"></div>
+  </section>
+
+  <!-- Pastas do computador -->
+  <section class="page" id="page-folders">
+    <h1>Pastas do computador</h1>
+    <p class="lead">As pastas ligadas são copiadas para <b>Meu OneDrive</b>. Nada é baixado para o PC e apagar no PC não apaga na nuvem.</p>
+    <div class="card"><div class="rows" id="foldersRows"></div>
+      <div class="actions"><button class="btn primary" data-cmd="addFolder"><svg><use href="#i-plus"/></svg>Adicionar pasta</button></div>
+    </div>
+  </section>
+
+  <!-- SharePoint -->
+  <section class="page" id="page-sharepoint">
+    <h1>SharePoint</h1>
+    <p class="lead">Bibliotecas que aparecem em <b class="spPath"></b>. Para adicionar outra, abra a biblioteca no navegador e clique em <b>Sincronizar</b>.</p>
+    <div class="card"><div class="rows" id="spRows"></div>
+      <div class="actions"><button class="btn" data-cmd="addAll"><svg><use href="#i-plus"/></svg>Adicionar todas que eu acesso</button></div>
+    </div>
+  </section>
+
+  <!-- Preferências -->
+  <section class="page" id="page-preferences">
+    <h1>Preferências</h1>
+    <p class="lead">Como o OneDrive 365 funciona neste computador.</p>
+    <div class="card"><div class="rows">
+      <div class="row"><svg><use href="#i-sites"/></svg><div><div class="name">Botão "Sincronizar" do SharePoint abre o OneDrive 365</div><div class="sub">Desligado, o botão volta a abrir o OneDrive da Microsoft.</div></div>
+        <label class="switch"><input type="checkbox" id="prefIntercept"><span></span></label></div>
+      <div class="row"><svg><use href="#i-sync"/></svg><div><div class="name">Horário de sincronização</div>
+          <div class="sub">Envia as pastas do PC só neste intervalo, para não pesar na internet durante o expediente.</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">das <input type="time" id="schedFrom" class="timeinp"> às <input type="time" id="schedTo" class="timeinp"></div></div>
+        <label class="switch"><input type="checkbox" id="schedOn"><span></span></label></div>
+      <div class="row"><svg><use href="#i-pc"/></svg><div><div class="name">Unidade</div><div class="sub" id="prefDrive"></div></div><div class="side"></div></div>
+      <div class="row"><svg><use href="#i-cloud"/></svg><div><div class="name">Arquivos no computador</div><div class="sub">Só o que você abre é baixado. Fica em cache até 20 GB e sai depois de 7 dias sem uso.</div></div><div class="side"></div></div>
+      <div class="row"><svg><use href="#i-file"/></svg><div><div class="name">Registros</div><div class="sub">Para suporte técnico.</div></div><button class="btn" data-cmd="openLogs">Abrir pasta</button></div>
+    </div></div>
+  </section>
+
+  <!-- Sobre -->
+  <section class="page" id="page-about">
+    <h1>Sobre</h1>
+    <div class="card">
+      <p><b>OneDrive 365</b> <span class="muted" id="version"></span></p>
+      <p class="muted">Mostra o OneDrive e o SharePoint como uma unidade do Windows. Os arquivos ficam na nuvem e só são baixados quando você abre.</p>
+      <p class="muted">Feito por Caique Santos Barbosa com software livre: rclone (MIT) e WinFsp (GPLv3). Não é um produto da Microsoft.</p>
+    </div>
+  </section>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<div class="popover" id="menu" role="menu">
+  <button data-page="preferences" role="menuitem"><svg><use href="#i-gear"/></svg>Preferências</button>
+  <button data-page="notifications" role="menuitem"><svg><use href="#i-warn"/></svg>Lista de erros</button>
+  <button data-page="sharepoint" role="menuitem"><svg><use href="#i-sharepoint"/></svg>Gerenciar SharePoint</button>
+  <button data-page="folders" role="menuitem"><svg><use href="#i-explorer"/></svg>Pastas do computador</button>
+  <hr>
+  <button data-page="about" role="menuitem"><svg><use href="#i-info"/></svg>Sobre</button>
+  <button data-cmd="openLogs" role="menuitem"><svg><use href="#i-file"/></svg>Abrir registros</button>
+  <hr>
+  <button data-cmd="quit" role="menuitem"><svg><use href="#i-x"/></svg>Sair do OneDrive 365</button>
+</div>
+<div class="popover" id="account" role="dialog" aria-label="Conta"></div>
+<div class="modal-back" id="pickBack" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+  <div class="modal">
+    <header><h2 id="pickTitle">Escolher pastas</h2><div class="muted" id="pickSub"></div></header>
+    <div class="tree" id="tree"></div>
+    <div class="foot">
+      <span class="muted" id="pickCount"></span>
+      <span class="actions" style="margin:0"><button class="btn" id="pickCancel">Cancelar</button><button class="btn primary" id="pickSave">Salvar</button></span>
+    </div>
+  </div>
+</div>
+<div class="popover" id="results" role="listbox" aria-label="Resultados da pesquisa"></div>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const send = (cmd, args = {}) => window.chrome.webview.postMessage({ cmd, ...args });
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const icon = (id) => `<svg><use href="#i-${id}"/></svg>`;
+  let S = null;
+  let page = "home";
+
+  function size(b) {
+    if (b == null) return "";
+    if (b >= 1 << 30) return (b / (1 << 30)).toFixed(1).replace(".", ",") + " GB";
+    if (b >= 1 << 20) return Math.round(b / (1 << 20)) + " MB";
+    return Math.max(1, Math.round(b / 1024)) + " KB";
+  }
+  function ago(iso) {
+    if (!iso) return "";
+    const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (m < 1) return "agora";
+    if (m < 60) return `há ${m} min`;
+    const h = Math.round(m / 60);
+    return h < 24 ? `há ${h} h` : new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+  function readableUrl(u) {
+    try { const x = new URL(u); return decodeURIComponent(x.hostname.split(".")[0] + x.pathname).replace(/\/$/, ""); }
+    catch { return u; }
+  }
+  function initials(name) { return (name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase(); }
+  function avatar(el, a) {
+    el.innerHTML = a?.photo ? `<img class="avatar-img" src="${a.photo}" alt="">` : esc(initials(a?.name));
+  }
+
+  function go(p) {
+    page = p;
+    document.querySelectorAll(".page").forEach((s) => s.classList.toggle("active", s.id === "page-" + p));
+    document.querySelectorAll(".nav-item").forEach((n) =>
+      n.dataset.page === p ? n.setAttribute("aria-current", "page") : n.removeAttribute("aria-current"));
+    closePopovers();
+    $("main").scrollTop = 0;
+  }
+
+  function closePopovers() { document.querySelectorAll(".popover, .scrim").forEach((e) => e.classList.remove("open")); }
+  function openPopover(id) { closePopovers(); $(id).classList.add("open"); $("#scrim").classList.add("open"); }
+
+  function render() {
+    if (!S) return;
+    $("#brandIcon").src = S.cloudIcon;
+    $("#statusCloud").src = S.cloudIcon;
+    document.querySelectorAll(".driveLetter").forEach((e) => (e.textContent = `Abrir unidade ${S.letter}`));
+    document.querySelectorAll(".spPath").forEach((e) => (e.textContent = `${S.letter}\\SharePoint`));
+    $("#openDriveLabel").textContent = `Abrir OneDrive 365 (${S.letter})`;
+
+    // Conta
+    const a = S.account;
+    $("#accountShort").textContent = a ? (a.name || a.email) : "Entrar";
+    $("#accountBtn").title = a ? a.email : "Entrar com a conta Microsoft";
+    avatar($("#avatarSmall"), a);
+    if (a && a.total) {
+      $("#storageBox").hidden = false;
+      $("#storageText").textContent = `${size(a.used)} de ${size(a.total)} usados`;
+      $("#storageBar").style.width = Math.min(100, (a.used / a.total) * 100).toFixed(1) + "%";
+    }
+
+    // Pausa
+    $("#pauseBtn").setAttribute("aria-pressed", S.paused ? "true" : "false");
+    $("#pauseBtn").title = S.paused ? "Retomar backup" : "Pausar backup";
+    $("#pauseBtn").innerHTML = icon(S.paused ? "play" : "pause");
+
+    // Status
+    const st = S.status;
+    const badge = $("#statusBadge");
+    badge.className = "badge " + st.kind;
+    badge.innerHTML = icon({ ok: "check", sync: "sync", error: "x", paused: "pause" }[st.kind] || "check");
+    $("#statusTitle").textContent = st.title;
+    $("#statusSub").textContent = st.detail;
+
+    // Pastas (resumo)
+    const on = S.folders.filter((f) => f.enabled);
+    $("#foldersSummary").textContent = on.length ? `${on.length} pasta(s) com backup para Meu OneDrive.` : "Nenhuma pasta com backup. Escolha quais pastas do PC vão para a nuvem.";
+    $("#foldersChips").innerHTML = on.map((f) => `<span class="chip">${f.icon ? `<img src="${f.icon}" alt="">` : ""}${esc(f.name)}</span>`).join("");
+
+    // SharePoint (resumo)
+    $("#spSummary").textContent = S.libraries.length
+      ? `${S.libraries.length} biblioteca(s) em ${S.letter}\\SharePoint.`
+      : `Nenhuma biblioteca ainda. Clique em "Sincronizar" numa biblioteca do SharePoint para ela aparecer aqui.`;
+
+    // Notificações
+    const n = S.notifications.length;
+    $("#notifCount").hidden = n === 0;
+    $("#notifCount").textContent = n;
+    $("#noticeTitle").textContent = n ? `${n} item(ns) precisam de atenção` : "Tudo em dia";
+    $("#noticeText").textContent = n ? S.notifications[0].title : "Quando algo precisar da sua atenção, aparece aqui.";
+    $("#noticeActions").hidden = n === 0;
+    $("#notifBody").innerHTML = n
+      ? `<div class="rows">${S.notifications.map((x) => `
+          <div class="row"><span class="state ${x.level === "error" ? "error" : "sync"}">${icon(x.level === "error" ? "warn" : "info")}</span>
+            <div><div class="name">${esc(x.title)}</div><div class="sub">${esc(x.detail)}</div></div>
+            <div class="side">${esc(ago(x.time))}</div></div>`).join("")}</div>`
+      : `<div class="empty">${icon("check")}<h2>Tudo em dia</h2><div>Quando algo precisar da sua atenção, aparece aqui.</div></div>`;
+
+    renderActivity();
+    renderFolders();
+    renderLibraries();
+
+    $("#prefIntercept").checked = S.interceptSync;
+    if (document.activeElement?.className !== "timeinp") { $("#schedFrom").value = S.schedule.from; $("#schedTo").value = S.schedule.to; }
+    $("#schedOn").checked = S.schedule.on;
+    $("#prefDrive").textContent = `${S.letter} (OneDrive 365). Abre sozinha quando você entra no Windows.`;
+    $("#version").textContent = "versão " + S.version;
+  }
+
+  function duration(sec) {
+    if (sec == null || !isFinite(sec)) return "";
+    if (sec < 90) return "menos de 2 min";
+    const m = Math.round(sec / 60);
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60), r = m % 60;
+    return r ? `${h} h ${r} min` : `${h} h`;
+  }
+
+  function progressBlock(p) {
+    if (!p) return "";
+    const counting = p.totalFiles === 0;
+    const pct = p.totalBytes ? Math.min(100, (p.bytes / p.totalBytes) * 100) : 0;
+    const nums = counting
+      ? `Comparando com a nuvem: ${p.checks.toLocaleString("pt-BR")} arquivos verificados`
+      : `${p.files.toLocaleString("pt-BR")} de ${p.totalFiles.toLocaleString("pt-BR")} arquivos, ${size(p.bytes)} de ${size(p.totalBytes)}` +
+        (p.speed ? `, ${size(p.speed)}/s` : "") + (p.eta != null && p.eta < 99 * 3600 ? `, faltam ${duration(p.eta)}` : ", calculando o tempo…");
+    return `<div class="progress"><div class="top"><span>Backup de ${esc(p.folder)}</span>
+        <span style="display:flex;align-items:center;gap:10px">${counting ? "" : Math.floor(pct) + "%"}
+          <button class="btn" data-cmd-pause="1" style="height:30px">${icon("pause")}Pausar</button></span></div>
+      <div class="bar"><i style="width:${counting ? 3 : pct.toFixed(1)}%"></i></div><div class="nums">${esc(nums)}</div></div>`;
+  }
+
+  function renderActivity() {
+    const st = S.status;
+    $("#actState").className = "state " + st.kind;
+    $("#actState").innerHTML = icon(st.kind === "sync" ? "sync" : st.kind === "error" ? "warn" : "cloud");
+    $("#actTitle").textContent = st.kind === "sync" ? "Sincronizando" : st.kind === "paused" ? "Backup pausado" : st.kind === "error" ? "Com problemas" : "Atualizado";
+    $("#actSub").textContent = S.lastActivity ? `Última atividade ${ago(S.lastActivity)}` : "";
+    const prog = S.backupProgress;
+    const held = S.paused || (S.schedule && S.schedule.on && !S.schedule.inside);
+    const resumeBlock = held && S.folders.some((f) => f.enabled)
+      ? `<div class="progress"><div class="top"><span>${S.paused ? "Sincronização pausada" : "Aguardando o horário de sincronização"}</span>
+          <button class="btn primary" data-cmd-resume="1" style="height:30px">${icon("play")}${S.paused ? "Retomar agora" : "Sincronizar agora"}</button></div>
+          <div class="nums">${S.paused ? "Nada está sendo enviado. O que já subiu não é enviado de novo." : `Fora do horário. O backup volta às ${esc(S.schedule.from)}.`}</div></div>` : "";
+    const sending = (prog?.transferring || []).map((t) => ({ name: t.name, where: t.where, size: t.size, status: "uploading", percent: t.percent }));
+    const items = sending.concat(S.activity);
+    if (!items.length && !prog && !resumeBlock) {
+      $("#actBody").innerHTML = `<div class="empty">${icon("cloud")}<h2>Nenhuma atividade ainda</h2><div>Os arquivos que você salvar em ${esc(S.letter)} e o backup das pastas do PC vão aparecer aqui.</div></div>`;
+      return;
+    }
+    const label = { uploading: ["sync", "Enviando"], done: ["ok", "Enviado"], error: ["error", "Erro"], backup: ["ok", "Backup"] };
+    $("#actBody").innerHTML = resumeBlock + progressBlock(prog) + (items.length ? `<table style="margin-top:12px"><colgroup><col><col class="c-size"><col class="c-status"><col class="c-act"></colgroup>
+      <thead><tr><th>Nome</th><th style="text-align:right;padding-right:14px">Tamanho</th><th>Status</th><th></th></tr></thead><tbody>${items.map((x) => {
+      const [k, t] = label[x.status] || ["ok", x.status];
+      return `<tr><td><div class="file" title="${esc(x.where + "\\" + x.name)}">${icon(x.status === "backup" ? "pc" : "file")}<div><div class="n">${esc(x.name)}</div><div class="p">${esc(x.where)}</div></div></div></td>
+        <td class="num">${size(x.size)}</td>
+        <td><span class="state ${k}">${icon(k === "ok" ? "check" : k === "sync" ? "sync" : "warn")}${esc(t)}${x.percent != null ? " " + x.percent + "%" : ""}</span><span class="when">${esc(x.time ? ago(x.time) : "")}</span></td>
+        <td>${x.path ? `<button class="reveal" data-reveal="${esc(x.path)}" title="Mostrar na pasta" aria-label="Mostrar na pasta">${icon("explorer")}</button>` : ""}</td></tr>`;
+    }).join("")}</tbody></table>` : "");
+  }
+
+  function renderFolders() {
+    $("#foldersRows").innerHTML = S.folders.map((f) => `
+      <div class="row">
+        ${f.icon ? `<img class="ico" src="${f.icon}" alt="">` : icon("folder")}
+        <div><div class="name">${esc(f.name)}</div>
+          <div class="sub ${f.error ? "error" : ""}" title="${esc(f.error || f.path)}">${esc(f.error ? "Erro no último backup: " + f.error : f.enabled && f.lastSync ? `Backup feito ${ago(f.lastSync)} em Meu OneDrive\\${f.remote}` : `${f.path}  →  Meu OneDrive\\${f.remote}`)}${f.excluded && f.excluded.length ? ` · ${f.excluded.length} subpasta(s) fora` : ""}</div></div>
+        <div class="side">${f.size == null ? "calculando…" : size(f.size)}
+          <button class="btn icon-only" data-pick="${esc(f.id)}" title="Escolher pastas" aria-label="Escolher pastas de ${esc(f.name)}">${icon("gear")}</button>
+          <button class="btn" data-open-local="${esc(f.id)}">${icon("explorer")}Abrir</button>
+          <button class="btn" data-folder-web="${esc(f.id)}">${icon("open")}Web</button>
+          ${f.custom ? `<button class="btn danger" data-remove-folder="${esc(f.id)}">Remover</button>` : ""}
+          <label class="switch" title="${f.enabled ? "Desligar backup" : "Ligar backup"}"><input type="checkbox" data-folder="${esc(f.id)}" ${f.enabled ? "checked" : ""} aria-label="Backup de ${esc(f.name)}"><span></span></label>
+        </div>
+      </div>`).join("");
+  }
+
+  function renderLibraries() {
+    $("#spRows").innerHTML = S.libraries.length ? S.libraries.map((l) => `
+      <div class="row">
+        <img class="ico" src="${S.sharePointIcon}" alt="">
+        <div><div class="name">${esc(l.name)}</div><div class="sub">${esc(l.root ? "Pasta: " + l.root : readableUrl(l.webUrl))}</div></div>
+        <div class="side">
+          <button class="btn" data-open-lib="${esc(l.name)}">${icon("explorer")}Abrir</button>
+          <button class="btn" data-web="${esc(l.webUrl)}">${icon("open")}Web</button>
+          <button class="btn danger" data-remove-lib="${esc(l.name)}">Remover</button>
+        </div>
+      </div>`).join("")
+      : `<div class="empty">${icon("sites")}<h2>Nenhuma biblioteca</h2><div>Abra uma biblioteca no SharePoint e clique em "Sincronizar".</div></div>`;
+  }
+
+  function renderAccount() {
+    const a = S?.account;
+    $("#account").innerHTML = a ? `
+      <div class="avatar" id="avatarBig"></div>
+      <h2>Olá, ${esc(a.name.split(" ")[0])}!</h2>
+      <div class="muted">${esc(a.email)}</div>
+      <div class="usage">
+        <div style="display:flex;justify-content:space-between;gap:8px"><span>${size(a.used)} de ${size(a.total)} usados</span>
+          ${a.manageUrl ? `<button class="link" data-web="${esc(a.manageUrl)}">Gerenciar armazenamento</button>` : ""}</div>
+        <div class="bar"><i style="width:${a.total ? Math.min(100, a.used / a.total * 100).toFixed(1) : 0}%"></i></div>
+      </div>
+      <button class="btn danger" data-cmd="signOut">${icon("signout")}Desvincular este PC</button>`
+      : `<h2>Nenhuma conta conectada</h2><p class="muted">Entre com a conta Microsoft do trabalho para ver seus arquivos.</p>
+         <button class="btn primary" data-cmd="signIn">Entrar</button>`;
+    if (a) avatar($("#avatarBig"), a);
+  }
+
+  // Eventos
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("button, [data-reveal]");
+    if (!t) return;
+    if (t.dataset.page) { go(t.dataset.page); return; }
+    if (t.dataset.cmd) { closePopovers(); send(t.dataset.cmd); return; }
+    if (t.dataset.web) { send("openUrl", { url: t.dataset.web }); return; }
+    if (t.dataset.openLib) { send("openLibrary", { name: t.dataset.openLib }); return; }
+    if (t.dataset.removeLib) { send("removeLibrary", { name: t.dataset.removeLib }); return; }
+    if (t.dataset.removeFolder) { send("removeFolder", { id: t.dataset.removeFolder }); return; }
+    if (t.dataset.openLocal) { send("openLocalFolder", { id: t.dataset.openLocal }); return; }
+    if (t.dataset.pick) { openPicker(t.dataset.pick); return; }
+    if (t.dataset.cmdPause) { send("pause", { on: true }); return; }
+    if (t.dataset.cmdResume) { send(S.paused ? "pause" : "setSchedule", S.paused ? { on: false } : { on: false, from: S.schedule.from, to: S.schedule.to }); return; }
+    if (t.dataset.tw) { toggleNode(t.dataset.tw, t); return; }
+    if (t.dataset.folderWeb) { send("openFolderWeb", { id: t.dataset.folderWeb }); return; }
+    if (t.dataset.reveal) { send("reveal", { path: t.dataset.reveal }); return; }
+    if (t.dataset.hit) { closePopovers(); send("openHit", { path: t.dataset.hit }); return; }
+  });
+  document.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.dataset.folder) { send("toggleFolder", { id: t.dataset.folder, on: t.checked }); return; }
+    if (t.id === "prefIntercept") send("setIntercept", { on: t.checked });
+    if (["schedOn", "schedFrom", "schedTo"].includes(t.id))
+      send("setSchedule", { on: $("#schedOn").checked, from: $("#schedFrom").value, to: $("#schedTo").value });
+  });
+  $("#gearBtn").onclick = () => openPopover("#menu");
+  $("#accountBtn").onclick = () => { renderAccount(); openPopover("#account"); };
+  $("#pauseBtn").onclick = () => send("pause", { on: !S.paused });
+  $("#scrim").onclick = closePopovers;
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePopovers(); });
+  $("#searchForm").onsubmit = (e) => {
+    e.preventDefault();
+    const q = $("#q").value.trim();
+    if (!q) return;
+    $("#results").innerHTML = `<div class="msg">Pesquisando…</div>`;
+    openPopover("#results");
+    send("search", { q });
+  };
+
+  // ---- Escolher pastas: árvore preguiçosa; excluded = subpastas fora (o que está dentro delas também sai) ----
+  let pick = null;   // { id, excluded:Set, loaded:Set }
+  const isOff = (rel) => [...pick.excluded].some((x) => rel === x || rel.startsWith(x + "/"));
+  const ancestorOff = (rel) => [...pick.excluded].some((x) => rel.startsWith(x + "/"));
+  const partial = (rel) => [...pick.excluded].some((x) => x.startsWith(rel + "/"));
+
+  function openPicker(id) {
+    const f = S.folders.find((x) => x.id === id);
+    pick = { id, excluded: new Set(f.excluded || []), loaded: new Set() };
+    $("#pickTitle").textContent = `Escolher pastas de ${f.name}`;
+    $("#pickSub").textContent = "Desmarque as pastas que não devem ir para o OneDrive. O que estiver dentro delas também fica de fora.";
+    $("#tree").innerHTML = `<div class="kids" data-kids=""><div class="node muted">Carregando…</div></div>`;
+    $("#pickBack").classList.add("open");
+    updateCount();
+    send("listDirs", { id, rel: "" });
+  }
+  function nodeHtml(d) {
+    return `<div data-node="${esc(d.rel)}">
+      <div class="node ${isOff(d.rel) ? "off" : ""}">
+        <button class="tw ${d.hasChildren ? "" : "none"}" data-tw="${esc(d.rel)}" aria-label="Expandir">${icon("chevr")}</button>
+        <input type="checkbox" data-chk="${esc(d.rel)}" ${isOff(d.rel) ? "" : "checked"} ${ancestorOff(d.rel) ? "disabled" : ""}>
+        <svg class="f"><use href="#i-folderfill"/></svg><span class="nm" title="${esc(d.rel)}">${esc(d.name)}</span>
+      </div>
+      <div class="kids" data-kids="${esc(d.rel)}" style="padding-left:22px" hidden></div>
+    </div>`;
+  }
+  function toggleNode(rel, btn) {
+    const kids = document.querySelector(`[data-kids="${CSS.escape(rel)}"]`);
+    const open = kids.hidden;
+    kids.hidden = !open;
+    btn.classList.toggle("open", open);
+    if (open && !pick.loaded.has(rel)) { kids.innerHTML = `<div class="node muted">Carregando…</div>`; send("listDirs", { id: pick.id, rel }); }
+  }
+  function refreshChecks() {
+    document.querySelectorAll("[data-chk]").forEach((c) => {
+      const rel = c.dataset.chk;
+      c.checked = !isOff(rel);
+      c.disabled = ancestorOff(rel);
+      c.indeterminate = !isOff(rel) && partial(rel);
+      c.closest(".node").classList.toggle("off", isOff(rel));
+    });
+    updateCount();
+  }
+  function updateCount() {
+    const n = pick ? pick.excluded.size : 0;
+    $("#pickCount").textContent = n ? `${n} pasta(s) fora do backup` : "Todas as pastas vão para o OneDrive";
+  }
+  document.addEventListener("change", (e) => {
+    const rel = e.target.dataset.chk;
+    if (rel == null || !pick) return;
+    if (e.target.checked) pick.excluded.delete(rel);
+    else {
+      [...pick.excluded].filter((x) => x.startsWith(rel + "/")).forEach((x) => pick.excluded.delete(x));   // já cobertas pela pasta-mãe
+      pick.excluded.add(rel);
+    }
+    refreshChecks();
+  });
+  $("#pickCancel").onclick = () => { $("#pickBack").classList.remove("open"); pick = null; };
+  $("#pickSave").onclick = () => { send("saveExclusions", { id: pick.id, excluded: [...pick.excluded] }); $("#pickBack").classList.remove("open"); pick = null; };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && pick) $("#pickCancel").click(); });
+
+  window.chrome.webview.addEventListener("message", (e) => {
+    const m = e.data;
+    if (m.type === "dirs" && pick && m.payload.id === pick.id) {
+      const box = document.querySelector(`[data-kids="${CSS.escape(m.payload.rel)}"]`);
+      if (box) {
+        pick.loaded.add(m.payload.rel);
+        box.innerHTML = m.payload.dirs.length ? m.payload.dirs.map(nodeHtml).join("") : `<div class="node muted">Sem subpastas</div>`;
+        refreshChecks();
+      }
+      return;
+    }
+    if (m.type === "state") { S = m.state; render(); }
+    else if (m.type === "navigate") go(m.payload);
+    else if (m.type === "results") {
+      const hits = m.payload.hits;
+      $("#results").innerHTML = m.payload.error ? `<div class="msg">${esc(m.payload.error)}</div>`
+        : !hits.length ? `<div class="msg">Nada encontrado para "${esc(m.payload.q)}".</div>`
+        : hits.map((h) => `<button data-hit="${esc(h.path)}">${icon(h.isFolder ? "folder" : "file")}<span><div>${esc(h.name)}</div><div class="p">Meu OneDrive\\${esc(h.path.replace(/\//g, "\\"))}</div></span></button>`).join("");
+    }
+  });
+
+  setInterval(() => { if (S) { renderActivity(); renderFolders(); } }, 30000);   // atualiza o "há X min"
+  go("home");
+  send("ready");
+</script>
+</body>
+</html>

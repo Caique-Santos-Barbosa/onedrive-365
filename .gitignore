@@ -1,0 +1,10 @@
+bin/
+obj/
+dist/
+shell/out/
+src/assets/rclone.exe
+src/assets/winfsp.msi
+src/assets/OneDrive365Shell.dll
+src/assets/OneDrive365Menu.dll
+src/assets/OneDrive365.msix
+src/assets/menu-version.txt

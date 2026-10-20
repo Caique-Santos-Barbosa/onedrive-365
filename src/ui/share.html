@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #FFFFFF; --ink: #242424; --soft: #616161; --line: #D1D1D1; --line-soft: #EDEBE9; --hover: #F5F5F5;
+    --accent: #0F6CBD; --accent-ink: #FFFFFF; --accent-soft: #EBF3FC; --ok: #0E7A0D; --error: #B3261E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #292929; --ink: #F5F5F5; --soft: #ADADAD; --line: #5C5C5C; --line-soft: #3D3D3D; --hover: #333333;
+            --accent: #479EF5; --accent-ink: #0A0A0A; --accent-soft: #1F3A55; --ok: #54B054; --error: #F1707B; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.43 "Segoe UI Variable Text", "Segoe UI", sans-serif; user-select: none; overflow: hidden; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  svg { width: 20px; height: 20px; flex: none; }
+  .view { display: none; padding: 20px 22px 22px; }
+  .view.active { display: block; }
+  h1 { font: 600 20px/1.3 "Segoe UI Variable Display", "Segoe UI", sans-serif; margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .icon-btn { width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; display: grid; place-items: center; color: var(--soft); cursor: pointer; flex: none; }
+  .icon-btn:hover { background: var(--hover); color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Pessoas */
+  .people { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; min-height: 44px; position: relative; }
+  .people:focus-within { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  .people .lead { padding: 0 6px 0 12px; color: var(--soft); display: grid; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; padding: 6px 0; align-items: center; min-width: 0; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--hover); border-radius: 12px; padding: 1px 4px 1px 10px; font-size: 13px; }
+  .chip button { border: 0; background: none; cursor: pointer; color: var(--soft); padding: 0 4px; }
+  #who { border: 0; outline: 0; background: transparent; flex: 1; min-width: 140px; padding: 6px 4px; }
+  .role { border-left: 1px solid var(--line); align-self: stretch; display: flex; align-items: center; gap: 2px; padding: 0 8px 0 10px; color: var(--soft); cursor: pointer; background: none; border-top: 0; border-right: 0; border-bottom: 0; }
+  .suggest { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 8px 16px rgba(0,0,0,.14); z-index: 5; display: none; }
+  .suggest button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 12px; cursor: pointer; }
+  .suggest button:hover { background: var(--hover); }
+  .suggest small { color: var(--soft); display: block; }
+  textarea { width: 100%; height: 124px; margin-top: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px 10px 38px; resize: none; background: var(--bg) no-repeat 12px 12px; outline: 0; }
+  textarea:focus { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  .msgwrap { position: relative; }
+  .msgwrap svg { position: absolute; left: 12px; top: 24px; color: var(--soft); width: 18px; height: 18px; }
+
+  .foot { display: flex; align-items: center; gap: 8px; margin-top: 22px; }
+  .lock { width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--hover); color: var(--soft); display: grid; place-items: center; cursor: pointer; }
+  .lock:hover { color: var(--ink); }
+  .spacer { flex: 1; }
+  .split { display: flex; border: 1px solid var(--accent); border-radius: 4px; overflow: hidden; }
+  .split button { border: 0; background: var(--accent-soft); color: var(--accent); height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 12px; cursor: pointer; font-weight: 600; }
+  .split button + button { border-left: 1px solid var(--accent); padding: 0 8px; }
+  .split button:hover { filter: brightness(.97); }
+  .primary { border: 0; border-radius: 4px; background: var(--accent); color: var(--accent-ink); height: 32px; padding: 0 16px; display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
+  .primary:disabled { opacity: .5; cursor: default; }
+  .status { margin-top: 12px; font-size: 13px; min-height: 18px; color: var(--soft); }
+  .status.ok { color: var(--ok); } .status.error { color: var(--error); }
+
+  .menu { position: absolute; right: 56px; top: 50px; background: var(--bg); border: 1px solid var(--line-soft); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.16); padding: 4px; display: none; z-index: 6; }
+  .menu button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+  .menu button:hover { background: var(--hover); }
+
+  /* Configurações de link */
+  .sub { color: var(--soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  h2 { font: 600 14px "Segoe UI", sans-serif; margin: 18px 0 8px; }
+  .opt { display: flex; align-items: center; gap: 12px; padding: 10px 10px; border-bottom: 1px solid var(--line-soft); cursor: pointer; border-radius: 4px; }
+  .opt:hover { background: var(--hover); }
+  .opt .badge { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; color: var(--soft); flex: none; }
+  .opt .badge svg { width: 16px; height: 16px; }
+  .opt .t { flex: 1; min-width: 0; }
+  .opt .t small { display: block; color: var(--soft); font-size: 12px; }
+  .opt input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .field { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding: 8px 4px; color: var(--soft); }
+  .field input, .field select { border: 0; outline: 0; background: transparent; flex: 1; padding: 4px 0; color: var(--ink); }
+  .field select { appearance: auto; }
+
+  /* Gerenciar acesso */
+  .tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--line-soft); margin-top: 16px; }
+  .tabs button { border: 0; background: none; padding: 8px 0; cursor: pointer; color: var(--soft); border-bottom: 2px solid transparent; font-weight: 600; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .who { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 600; font-size: 12px; flex: none; }
+  .avatar.link { background: var(--hover); color: var(--soft); }
+  .who .t { flex: 1; min-width: 0; }
+  .who .t small { display: block; color: var(--soft); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who .r { color: var(--soft); font-size: 13px; white-space: nowrap; }
+  .link-btn { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 4px 0; display: inline-flex; align-items: center; gap: 6px; }
+  .link-btn:disabled { color: var(--soft); opacity: .6; cursor: default; }
+  .rm { border: 0; background: none; color: var(--soft); cursor: pointer; padding: 4px; border-radius: 4px; }
+  .rm:hover { color: var(--error); background: var(--hover); }
+  .empty { color: var(--soft); padding: 14px 0 6px; }
+  .folderline { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: var(--soft); font-size: 13px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-person" viewBox="0 0 20 20"><circle cx="10" cy="6.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 17a6.5 6.5 0 0 1 13 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 20 20"><path d="M12.5 3.5l4 4L7 17H3v-4z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 20 20"><path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 20 20"><path d="M13 3.5l3.5 3.5L8 15.5H4.5V12z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M3 18h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 20 20"><rect x="4.5" y="9" width="11" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="13" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-link" viewBox="0 0 20 20"><path d="M8 13H6a3 3 0 0 1 0-6h2M12 7h2a3 3 0 0 1 0 6h-2M7 10h6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><path d="M8.6 2.6h2.8l.4 2a5.6 5.6 0 0 1 1.5.9l1.9-.7 1.4 2.4-1.5 1.3a5.7 5.7 0 0 1 0 1.8l1.5 1.3-1.4 2.4-1.9-.7a5.6 5.6 0 0 1-1.5.9l-.4 2H8.6l-.4-2a5.6 5.6 0 0 1-1.5-.9l-1.9.7-1.4-2.4 1.5-1.3a5.7 5.7 0 0 1 0-1.8L3.4 7.2l1.4-2.4 1.9.7a5.6 5.6 0 0 1 1.5-.9z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.3" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-send" viewBox="0 0 20 20"><path d="M3 10L17 3l-4 14-3.5-5.5z M9.5 11.5L17 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+  <symbol id="i-more" viewBox="0 0 20 20"><circle cx="5" cy="10" r="1.3" fill="currentColor"/><circle cx="10" cy="10" r="1.3" fill="currentColor"/><circle cx="15" cy="10" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-help" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 8a2 2 0 1 1 3 1.7c-.7.4-1 .9-1 1.6M10 14v.1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-back" viewBox="0 0 20 20"><path d="M16 10H4M9 5l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.3"/><ellipse cx="10" cy="10" rx="3" ry="7" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3 10h14" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-org" viewBox="0 0 20 20"><rect x="3" y="6" width="14" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7.5 6V4.5h5V6M3 10h14" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-existing" viewBox="0 0 20 20"><circle cx="9" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3.5 16a5.5 5.5 0 0 1 9-4.2M12.5 15l1.7 1.7 3.3-3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-choose" viewBox="0 0 20 20"><circle cx="8.5" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3 16a5.5 5.5 0 0 1 9.5-3.7M15 12v5M12.5 14.5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 20 20"><rect x="3" y="4.5" width="14" height="12.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3 8.5h14M7 3v3M13 3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-add" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10 6.5v7M6.5 10h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 10h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 20 20"><path d="M8 4H4.5a1 1 0 0 0-1 1v10.5a1 1 0 0 0 1 1H15a1 1 0 0 0 1-1V12M8.5 11.5l8-8M11.5 3.5h5v5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-folderfill" viewBox="0 0 20 20"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4l2 2h7A1.5 1.5 0 0 1 18 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5z" fill="#E8B33C"/><path d="M2 8h16v6.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5z" fill="#FFC83D"/></symbol>
+  <symbol id="i-fileline" viewBox="0 0 20 20"><path d="M5 2.5h6.5l4 4V17a.5.5 0 0 1-.5.5H5a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5zM11.5 2.5V6.5h4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+  <symbol id="i-outlook" viewBox="0 0 20 20"><rect x="2" y="5" width="10" height="10" rx="1.5" fill="#0F6CBD"/><text x="7" y="13.2" fill="#fff" font-size="7.5" font-weight="700" text-anchor="middle" font-family="Segoe UI">O</text><path d="M12 7h5.5v8H12" fill="none" stroke="#28A8EA" stroke-width="1.4"/></symbol>
+</svg>
+
+<!-- Compartilhar -->
+<section class="view" id="v-main">
+  <div class="head">
+    <h1 id="title"></h1>
+    <button class="icon-btn" id="moreBtn" title="Mais opções" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
+  </div>
+  <div class="menu" id="moreMenu" role="menu">
+    <button id="outlookBtn" role="menuitem"><svg><use href="#i-outlook"/></svg>Enviar link em Outlook</button>
+  </div>
+  <div class="people">
+    <span class="lead"><svg><use href="#i-person"/></svg></span>
+    <div class="chips" id="chips"><input id="who" placeholder="Adicionar um nome, grupo ou email" autocomplete="off" aria-label="Pessoas"></div>
+    <button class="role" id="roleBtn" title="Permissão"><svg id="roleIcon"><use href="#i-pencil"/></svg><svg><use href="#i-chev"/></svg></button>
+    <div class="suggest" id="suggest"></div>
+  </div>
+  <div class="menu" id="roleMenu" style="right:22px;top:110px" role="menu">
+    <button data-role="write" role="menuitem"><svg><use href="#i-pencil"/></svg>Pode editar</button>
+    <button data-role="read" role="menuitem"><svg><use href="#i-eye"/></svg>Pode exibir</button>
+  </div>
+  <div class="msgwrap"><svg><use href="#i-msg"/></svg><textarea id="message" placeholder="Adicionar uma mensagem" aria-label="Mensagem"></textarea></div>
+  <div class="foot">
+    <button class="lock" id="accessBtn" title="Gerenciar acesso"><svg><use href="#i-lock"/></svg></button>
+    <div class="spacer"></div>
+    <div class="split">
+      <button id="copyBtn"><svg><use href="#i-link"/></svg>Copiar link</button>
+      <button id="settingsBtn" title="Configurações de link"><svg><use href="#i-gear"/></svg></button>
+    </div>
+    <button class="primary" id="sendBtn"><svg><use href="#i-send"/></svg>Enviar</button>
+  </div>
+  <div class="status" id="mainStatus" role="status"></div>
+</section>
+
+<!-- Configurações de link -->
+<section class="view" id="v-settings">
+  <div class="head">
+    <button class="icon-btn" data-back title="Voltar"><svg><use href="#i-back"/></svg></button>
+    <div style="flex:1;min-width:0"><h1>Configurações de link</h1><div class="sub" id="settingsSub"></div></div>
+  </div>
+  <h2>Este link funciona para</h2>
+  <label class="opt"><span class="badge"><svg><use href="#i-globe"/></svg></span><span class="t">Alguém<small>Compartilhar com qualquer pessoa, não requer entrada</small></span><input type="radio" name="scope" value="anonymous"></label>
+  <label class="opt"><span class="badge"><svg><use href="#i-org"/></svg></span><span class="t" id="orgLabel">Pessoas na sua organização</span><input type="radio" name="scope" value="organization"></label>
+  <label class="opt"><span class="badge"><svg><use href="#i-existing"/></svg></span><span class="t">Somente pessoas com acesso existente</span><input type="radio" name="scope" value="existing"></label>
+  <label class="opt"><span class="badge"><svg><use href="#i-choose"/></svg></span><span class="t">Pessoas que você escolhe</span><input type="radio" name="scope" value="users"></label>
+  <h2>Mais configurações</h2>
+  <div class="field"><svg><use href="#i-pencil"/></svg><select id="linkRole" aria-label="Permissão do link"><option value="edit">Pode editar</option><option value="view">Pode exibir</option></select></div>
+  <div class="field" id="expField"><svg><use href="#i-cal"/></svg><input type="date" id="expires" aria-label="Data de validade" title="Definir data de validade"><button class="rm" id="clearExp" title="Limpar data"><svg><use href="#i-x"/></svg></button></div>
+  <div class="field" id="pwField"><svg><use href="#i-lock"/></svg><input type="password" id="password" placeholder="Definir senha" aria-label="Senha" autocomplete="new-password"></div>
+  <div class="foot"><div class="spacer"></div><button class="primary" id="applyBtn">Aplicar</button></div>
+</section>
+
+<!-- Gerenciar acesso -->
+<section class="view" id="v-access">
+  <div class="head">
+    <button class="icon-btn" data-back title="Voltar"><svg><use href="#i-back"/></svg></button>
+    <h1>Gerenciar acesso</h1>
+  </div>
+  <div class="folderline" id="accessItem"></div>
+  <div style="display:flex;gap:24px;margin-top:10px">
+    <button class="link-btn" data-goto="main"><svg><use href="#i-share"/></svg>Compartilhar</button>
+    <button class="link-btn" id="stopBtn"><svg><use href="#i-stop"/></svg>Parar de compartilhar</button>
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="person" aria-selected="true" id="tabPeople">Pessoas</button>
+    <button role="tab" data-tab="group" id="tabGroups">Grupos</button>
+    <button role="tab" data-tab="link" id="tabLinks">Links</button>
+  </div>
+  <div id="accessList"></div>
+  <div class="status" id="accessStatus" role="status"></div>
+</section>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const send = (cmd, args = {}) => chrome.webview.postMessage({ cmd, ...args });
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  let I = null, recipients = [], role = "write", tab = "person", perms = [];
+  let link = { scope: "anonymous", role: "edit", expires: "", password: "" };
+
+  function show(v) {
+    document.querySelectorAll(".view").forEach((e) => e.classList.toggle("active", e.id === "v-" + v));
+    closeMenus();
+    if (v === "access") loadAccess();
+    if (v === "settings") fillSettings();
+    requestAnimationFrame(() => send("resize", { height: document.querySelector(".view.active").offsetHeight }));
+  }
+  function closeMenus() { document.querySelectorAll(".menu").forEach((m) => (m.style.display = "none")); $("#suggest").style.display = "none"; }
+  function status(id, text, kind = "") { const e = $(id); e.className = "status " + kind; e.textContent = text; }
+  function initials(n) { return (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase(); }
+  function linkText() {
+    const who = { anonymous: "Qualquer pessoa com o link", organization: `Pessoas em ${I.org} com o link`, existing: "Somente pessoas com acesso existente", users: "Pessoas que você escolher" }[link.scope];
+    return link.scope === "existing" ? who + " podem abrir" : `${who} pode${link.role === "edit" ? " editar" : " exibir"}`;
+  }
+
+  // Pessoas
+  function renderChips() {
+    const input = $("#who");
+    $("#chips").innerHTML = recipients.map((r, i) => `<span class="chip">${esc(r.name || r.email)}<button data-rm="${i}" title="Remover">×</button></span>`).join("");
+    $("#chips").appendChild(input);
+    input.focus();
+  }
+  function addRecipient(email, name) {
+    email = email.trim().replace(/[;,]$/, "");
+    if (!email || recipients.some((r) => r.email.toLowerCase() === email.toLowerCase())) return;
+    recipients.push({ email, name });
+    $("#who").value = "";
+    renderChips();
+  }
+  let searchTimer;
+  $("#who").addEventListener("input", (e) => {
+    const v = e.target.value;
+    if (/[,;]\s*$/.test(v)) { addRecipient(v); return; }
+    clearTimeout(searchTimer);
+    if (v.trim().length >= 2) searchTimer = setTimeout(() => send("people", { q: v.trim() }), 250);
+    else $("#suggest").style.display = "none";
+  });
+  $("#who").addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === "Tab") && e.target.value.trim()) { e.preventDefault(); addRecipient(e.target.value); }
+    if (e.key === "Backspace" && !e.target.value && recipients.length) { recipients.pop(); renderChips(); }
+  });
+  $("#roleBtn").onclick = (e) => { e.stopPropagation(); const m = $("#roleMenu"); m.style.display = m.style.display === "block" ? "none" : "block"; };
+  document.querySelectorAll("#roleMenu [data-role]").forEach((b) => b.onclick = () => {
+    role = b.dataset.role;
+    $("#roleIcon").innerHTML = `<use href="#i-${role === "write" ? "pencil" : "eye"}"/>`;
+    closeMenus();
+  });
+  $("#moreBtn").onclick = (e) => { e.stopPropagation(); const m = $("#moreMenu"); m.style.display = m.style.display === "block" ? "none" : "block"; };
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-rm]")) { recipients.splice(+e.target.closest("[data-rm]").dataset.rm, 1); renderChips(); return; }
+    if (e.target.closest("[data-pick]")) { const b = e.target.closest("[data-pick]"); addRecipient(b.dataset.pick, b.dataset.name); $("#suggest").style.display = "none"; return; }
+    if (e.target.closest("[data-back]")) { show("main"); return; }
+    if (e.target.closest("[data-goto]")) { show(e.target.closest("[data-goto]").dataset.goto); return; }
+    if (e.target.closest("[data-del]")) { const id = e.target.closest("[data-del]").dataset.del; status("#accessStatus", "Removendo…"); send("deletePermission", { id }); return; }
+    if (e.target.closest("[data-tab]")) { tab = e.target.closest("[data-tab]").dataset.tab; renderAccess(); return; }
+    if (!e.target.closest(".menu") && !e.target.closest("#roleBtn") && !e.target.closest("#moreBtn")) closeMenus();
+  });
+
+  $("#sendBtn").onclick = () => {
+    if ($("#who").value.trim()) addRecipient($("#who").value);
+    if (!recipients.length) { $("#who").focus(); status("#mainStatus", "Adicione pelo menos uma pessoa.", "error"); return; }
+    $("#sendBtn").disabled = true; status("#mainStatus", "Enviando…");
+    send("invite", { emails: recipients.map((r) => r.email), role, message: $("#message").value });
+  };
+  $("#copyBtn").onclick = () => { status("#mainStatus", "Criando link…"); send("link", link); };
+  $("#settingsBtn").onclick = () => show("settings");
+  $("#accessBtn").onclick = () => show("access");
+  $("#outlookBtn").onclick = () => { closeMenus(); status("#mainStatus", "Criando link…"); send("outlook", link); };
+
+  // Configurações de link
+  function fillSettings() {
+    document.querySelectorAll('input[name="scope"]').forEach((r) => (r.checked = r.value === link.scope));
+    $("#linkRole").value = link.role; $("#expires").value = link.expires; $("#password").value = link.password;
+    toggleExtras();
+  }
+  function toggleExtras() {
+    const s = document.querySelector('input[name="scope"]:checked')?.value;
+    // Validade e senha só valem para "Alguém" no OneDrive for Business; acesso existente não cria permissão nova
+    $("#expField").style.opacity = $("#pwField").style.opacity = s === "anonymous" ? 1 : .4;
+    $("#expires").disabled = $("#password").disabled = s !== "anonymous";
+    $("#linkRole").disabled = s === "existing";
+  }
+  document.querySelectorAll('input[name="scope"]').forEach((r) => r.onchange = toggleExtras);
+  $("#clearExp").onclick = () => ($("#expires").value = "");
+  $("#applyBtn").onclick = () => {
+    link = { scope: document.querySelector('input[name="scope"]:checked').value, role: $("#linkRole").value,
+             expires: $("#expires").disabled ? "" : $("#expires").value, password: $("#password").disabled ? "" : $("#password").value };
+    send("saveLinkDefaults", link);
+    show("main");
+    status("#mainStatus", linkText() + ".");
+  };
+
+  // Gerenciar acesso
+  function loadAccess() { $("#accessList").innerHTML = `<div class="empty">Carregando…</div>`; send("permissions"); }
+  function renderAccess() {
+    const count = (k) => perms.filter((p) => k === "person" ? p.kind === "person" || p.kind === "owner" : p.kind === k).length;
+    $("#tabPeople").textContent = `Pessoas • ${count("person")}`;
+    $("#tabGroups").textContent = count("group") ? `Grupos • ${count("group")}` : "Grupos";
+    $("#tabLinks").textContent = count("link") ? `Links • ${count("link")}` : "Links";
+    document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
+    const shared = perms.some((p) => p.kind !== "owner" && !p.inherited);
+    $("#stopBtn").disabled = !shared;
+    const list = perms.filter((p) => tab === "person" ? p.kind === "person" || p.kind === "owner" : p.kind === tab);
+    let html = list.map((p) => `<div class="who">
+        <span class="avatar ${p.kind === "link" ? "link" : ""}">${p.kind === "link" ? '<svg style="width:16px;height:16px"><use href="#i-link"/></svg>' : esc(initials(p.name))}</span>
+        <span class="t">${esc(p.name)}<small>${esc(p.kind === "link" ? (p.detail || "") : p.detail)}</small></span>
+        <span class="r">${esc(p.role)}${p.inherited ? " (herdado)" : ""}</span>
+        ${p.kind !== "owner" && !p.inherited ? `<button class="rm" data-del="${esc(p.id)}" title="Remover acesso"><svg style="width:16px;height:16px"><use href="#i-x"/></svg></button>` : ""}
+      </div>`).join("");
+    if (tab === "person" && !shared)
+      html += `<div class="empty">Esta ${I.isFolder ? "pasta" : "arquivo"} ainda não foi compartilhad${I.isFolder ? "a" : "o"} com ninguém.</div>
+               <button class="link-btn" data-goto="main"><svg><use href="#i-add"/></svg>Iniciar compartilhamento</button>`;
+    else if (!list.length) html += `<div class="empty">${tab === "group" ? "Nenhum grupo tem acesso." : "Nenhum link criado."}</div>`;
+    $("#accessList").innerHTML = html;
+    send("resize", { height: document.querySelector(".view.active").offsetHeight });
+  }
+  $("#stopBtn").onclick = () => { status("#accessStatus", "Parando de compartilhar…"); send("stopSharing"); };
+
+  chrome.webview.addEventListener("message", (e) => {
+    const m = e.data;
+    if (m.type === "init") {
+      I = m;
+      link = m.link;
+      $("#title").textContent = `Compartilhar "${m.name}"`; $("#title").title = m.name;
+      $("#settingsSub").textContent = m.name;
+      $("#orgLabel").innerHTML = `Pessoas em ${esc(m.org)}`;
+      $("#accessItem").innerHTML = `<svg><use href="#i-${m.isFolder ? "folderfill" : "fileline"}"/></svg>${esc(m.name)}`;
+      show(m.view || "main");
+      if (m.view === "settings") fillSettings();
+    }
+    if (m.type === "people") {
+      const box = $("#suggest");
+      box.innerHTML = m.list.map((p) => `<button data-pick="${esc(p.email)}" data-name="${esc(p.name)}">${esc(p.name)}<small>${esc(p.email)}</small></button>`).join("");
+      box.style.display = m.list.length ? "block" : "none";
+    }
+    if (m.type === "link") status("#mainStatus", m.ok ? `Link copiado. ${linkText()}.` : m.error, m.ok ? "ok" : "error");
+    if (m.type === "invite") { $("#sendBtn").disabled = false;
+      if (m.ok) { recipients = []; renderChips(); $("#message").value = ""; }
+      status("#mainStatus", m.ok ? `Enviado para ${m.count} pessoa(s).` : m.error, m.ok ? "ok" : "error"); }
+    if (m.type === "permissions") { if (m.ok) { perms = m.list; renderAccess(); status("#accessStatus", ""); } else status("#accessStatus", m.error, "error"); }
+    if (m.type === "changed") { status("#accessStatus", m.ok ? "Acesso atualizado." : m.error, m.ok ? "ok" : "error"); if (m.ok) loadAccess(); }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") send("close"); });
+  send("ready");
+</script>
+</body>
+</html>

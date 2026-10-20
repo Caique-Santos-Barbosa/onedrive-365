@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pacote "sparse": não traz o app, só dá identidade a ele (pasta externa = instalação do OneDrive 365)
+     para o Windows 11 aceitar o menu "OneDrive 365" no menu compacto do botão direito. -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 desktop4 desktop5 com rescap">
+
+  <Identity Name="HDTEnergy.OneDrive365" Publisher="CN=HDT Energy OneDrive 365" Version="$VERSION$" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>OneDrive 365</DisplayName>
+    <PublisherDisplayName>Caique Santos Barbosa</PublisherDisplayName>
+    <Logo>logo.png</Logo>
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
+  </Properties>
+
+  <Resources>
+    <Resource Language="pt-br" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="OneDrive365" Executable="OneDrive365.exe"
+                 uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
+      <uap:VisualElements AppListEntry="none" DisplayName="OneDrive 365" Description="OneDrive e SharePoint sob demanda"
+                          BackgroundColor="transparent" Square150x150Logo="logo.png" Square44x44Logo="logo.png" />
+      <Extensions>
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type="*">
+              <desktop5:Verb Id="OneDrive365" Clsid="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb Id="OneDrive365" Clsid="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory\Background">
+              <desktop5:Verb Id="OneDrive365" Clsid="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer DisplayName="OneDrive 365">
+              <com:Class Id="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010" Path="OneDrive365Menu.dll" ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>
+

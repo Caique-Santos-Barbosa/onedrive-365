@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #FFFFFF; --soft-bg: #F3F5F8; --ink: #1B1F24; --soft: #5B6573; --line: #E3E7EC;
+    --accent: #005FB8; --accent-hover: #0067C0; --accent-ink: #FFFFFF; --accent-soft: #E6F0FA; --ok: #0F7B0F; --error: #C42B1C;
+    --band: #F3F3F3; --btn-border: #D1D1D1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #26292D; --soft-bg: #1C1E21; --ink: #ECEFF3; --soft: #A7B0BC; --line: #393D43;
+            --accent: #60CDFF; --accent-hover: #5AB9E8; --accent-ink: #000000; --accent-soft: #23374B; --ok: #6CCB5F; --error: #FF99A4;
+            --band: #202020; --btn-border: #444444; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", sans-serif; user-select: none; overflow: hidden; }
+  button, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  svg { width: 20px; height: 20px; flex: none; }
+
+  .step { display: none; height: 100%; flex-direction: column; padding: 24px 32px 20px; }
+  .step.active { display: flex; }
+  .body { flex: 1; min-height: 0; }
+  .hero { width: 64px; height: 64px; margin-bottom: 16px; }
+  h1 { font: 600 20px/1.3 "Segoe UI Variable Display", "Segoe UI", sans-serif; margin: 0 0 6px; }
+  p { color: var(--ink); margin: 0 0 14px; max-width: 58ch; font-size: 14px; }
+  .actions { display: flex; align-items: center; gap: 10px; }
+  .actions .spacer { flex: 1; }
+  .btn { height: 32px; min-width: 96px; padding: 0 16px; border-radius: 4px; border: 1px solid var(--btn-border); background: var(--bg); cursor: pointer; font-size: 14px; }
+  .btn:hover { background: var(--band); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .link { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font-weight: 600; }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 6px; height: 6px; border-radius: 3px; background: var(--line); }
+  .dots i.on { width: 18px; background: var(--accent); }
+
+  .email { width: 100%; max-width: 380px; height: 32px; border: 1px solid var(--btn-border); border-bottom-color: #868686; border-radius: 4px; padding: 0 10px; background: var(--bg); outline: 0; font-size: 14px; }
+  .email:focus { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  .err { color: var(--error); font-size: 13px; min-height: 20px; margin-top: 6px; }
+
+  .spinner { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 1s linear infinite; margin-bottom: 20px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+
+  /* M: */
+  .drive { border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; max-width: 460px; background: var(--soft-bg); }
+  .drive .head { display: flex; align-items: center; gap: 10px; font-weight: 600; margin-bottom: 8px; }
+  .drive .head img { width: 22px; height: 22px; }
+  .drive .row { display: flex; align-items: center; gap: 10px; padding: 4px 0 4px 26px; }
+  .drive .row img { width: 22px; height: 22px; }
+  .drive .row small { color: var(--soft); display: block; font-size: 12.5px; }
+  .note { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; color: var(--soft); max-width: 460px; font-size: 13px; }
+  .note svg { color: var(--accent); margin-top: 1px; }
+
+  /* pastas */
+  .folders { border: 1px solid var(--line); border-radius: 6px; overflow: auto; max-height: 170px; }
+  .frow { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 12px; align-items: center; padding: 6px 12px; border-bottom: 1px solid var(--line); }
+  .frow:last-child { border-bottom: 0; }
+  .frow img { width: 28px; height: 28px; }
+  .frow .n { font-weight: 600; }
+  .frow small { color: var(--soft); font-size: 12.5px; }
+  .switch { position: relative; width: 40px; height: 22px; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; position: absolute; cursor: pointer; z-index: 1; }
+  .switch span { position: absolute; inset: 0; border-radius: 11px; border: 1px solid var(--soft); }
+  .switch span::after { content: ""; position: absolute; width: 12px; height: 12px; left: 4px; top: 4px; border-radius: 50%; background: var(--soft); transition: transform .15s; }
+  .switch input:checked + span { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + span::after { background: var(--accent-ink); transform: translateX(18px); }
+  .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Entrar (modelo da tela de login do OneDrive) */
+  #s-welcome { padding: 0; }
+  #s-welcome .body { padding: 20px 24px 0; display: flex; flex-direction: column; }
+  #s-welcome h1 { margin-bottom: 12px; }
+  .art { display: block; margin: 4px auto 0; width: 340px; max-width: 100%; height: auto; }
+  img.art { width: auto; height: 228px; margin: 22px auto 14px; }
+  .art-sm { display: block; height: 118px; width: auto; margin: 0 0 12px; }
+  .art-sm[hidden], img.art[hidden] { display: none; }
+  .field-label { display: block; margin: 0 0 6px 54px; font-size: 14px; }
+  .email-wrap { position: relative; margin: 0 54px; }
+  #s-welcome .email { max-width: none; width: 100%; padding-right: 36px; }
+  .email-clear { position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+  .email-clear:hover { background: var(--band); }
+  .email-clear[hidden] { display: none; }
+  #s-welcome .err { margin: 6px 54px 0; }
+  .band { background: var(--band); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 24px 32px; }
+  .band .btn:not(.primary) { background: #FDFDFD; border-color: #E5E5E5; border-bottom-color: #CCCCCC; }
+  .band .btn { width: 100%; }
+  /* etapas depois do login: ilustração, título e texto centralizados; faixa cinza com os botões */
+  .step.flow { padding: 0; }
+  .flow .body { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 20px 32px 12px; }
+  .flow .body > p { margin-left: auto; margin-right: auto; color: var(--soft); }
+  .flow .art-sm { margin: 0 auto 14px; height: 132px; }
+  .flow .foot { background: var(--band); display: flex; align-items: center; gap: 10px; padding: 20px 32px; }
+  .flow .foot .spacer { flex: 1; }
+  .flow .foot .btn:not(.primary) { background: #FDFDFD; border-color: #E5E5E5; border-bottom-color: #CCCCCC; }
+  .flow .drive, .flow .note { text-align: left; width: 100%; }
+  #s-folders .body { padding-bottom: 14px; }
+  #s-folders .art-sm { height: 104px; margin-bottom: 10px; }
+  #s-folders .folders { flex: 1; min-height: 0; max-height: none; width: 100%; text-align: left; }
+  .frow { grid-template-columns: 28px 1fr auto auto auto !important; }
+  .frow .n { font-weight: 600; }
+  .frow small.ex { color: var(--accent); }
+  .gear { width: 30px; height: 30px; border: 0; border-radius: 4px; background: transparent; color: var(--soft); cursor: pointer; display: grid; place-items: center; }
+  .gear:hover { background: var(--band); color: var(--ink); }
+  .gear svg { width: 18px; height: 18px; }
+  .flow .foot .status { flex: 1; min-width: 0; text-align: left; font-size: 13px; color: var(--soft); line-height: 1.35; }
+  .flow .foot .status.bad { color: var(--error); }
+  #s-done .art-sm { height: 190px; margin-top: 12px; }
+
+  /* Escolher subpastas */
+  .modal-back { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.32); display: none; place-items: center; }
+  .modal-back.open { display: grid; }
+  .modal { width: calc(100vw - 48px); height: calc(100vh - 48px); display: flex; flex-direction: column; background: var(--bg); border-radius: 8px; box-shadow: 0 24px 48px rgba(0,0,0,.24); overflow: hidden; }
+  .modal header { padding: 20px 24px 6px; }
+  .modal h2 { font: 600 18px/1.3 "Segoe UI Variable Display", "Segoe UI", sans-serif; margin: 0 0 4px; }
+  .modal .muted { color: var(--soft); font-size: 13px; }
+  .tree { flex: 1; overflow: auto; margin: 8px 24px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 0; }
+  .modal .foot { display: flex; align-items: center; gap: 8px; padding: 14px 24px; background: var(--band); }
+  .modal .foot .muted { flex: 1; }
+  .node { display: flex; align-items: center; gap: 6px; padding: 3px 10px; white-space: nowrap; }
+  .node:hover { background: var(--soft-bg); }
+  .node .tw { width: 22px; height: 22px; border: 0; background: none; color: var(--soft); cursor: pointer; display: grid; place-items: center; border-radius: 4px; flex: none; }
+  .node .tw svg { width: 14px; height: 14px; transition: transform .12s; }
+  .node .tw.open svg { transform: rotate(90deg); }
+  .node .tw.none { visibility: hidden; }
+  .node input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0 4px 0 0; flex: none; }
+  .node svg.f { width: 18px; height: 18px; color: #E8B33C; }
+  .node .nm { overflow: hidden; text-overflow: ellipsis; }
+  .node.off .nm, .node.muted { color: var(--soft); }
+  .check { width: 72px; height: 72px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; margin-bottom: 20px; }
+  .check svg { width: 36px; height: 36px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6.5v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><path d="M8.6 2.6h2.8l.4 2a5.6 5.6 0 0 1 1.5.9l1.9-.7 1.4 2.4-1.5 1.3a5.7 5.7 0 0 1 0 1.8l1.5 1.3-1.4 2.4-1.9-.7a5.6 5.6 0 0 1-1.5.9l-.4 2H8.6l-.4-2a5.6 5.6 0 0 1-1.5-.9l-1.9.7-1.4-2.4 1.5-1.3a5.7 5.7 0 0 1 0-1.8L3.4 7.2l1.4-2.4 1.9.7a5.6 5.6 0 0 1 1.5-.9z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-chevr" viewBox="0 0 20 20"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-folderfill" viewBox="0 0 20 20"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4l2 2h7A1.5 1.5 0 0 1 18 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5z" fill="currentColor"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="m4.5 10.5 3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<!-- 1. Entrar (modelo da tela de login do OneDrive) -->
+<section class="step" id="s-welcome">
+  <div class="body">
+    <h1>Entrar no OneDrive 365</h1>
+    <p>Faça backup, exiba e edite seus arquivos em vários dispositivos.</p>
+    <img class="art" id="artLogin" alt="" hidden>
+    <svg class="art" id="artLoginOwn" viewBox="0 0 420 200" aria-hidden="true">
+      <!-- nuvem pequena atrás e nuvem grande -->
+      <g fill="#A8C8F2"><circle cx="70" cy="74" r="16"/><circle cx="92" cy="66" r="22"/><rect x="52" y="70" width="72" height="22" rx="11"/></g>
+      <g fill="#0F78D4"><circle cx="128" cy="44" r="34"/><circle cx="176" cy="56" r="24"/><circle cx="104" cy="66" r="22"/><rect x="88" y="54" width="112" height="34" rx="17"/></g>
+      <!-- caminho tracejado até o notebook -->
+      <path d="M142 90 C140 128, 214 112, 222 140 S206 170, 214 176" fill="none" stroke="#2B88D8" stroke-width="3" stroke-dasharray="8 7" stroke-linecap="round"/>
+      <!-- notebook -->
+      <path d="M238 136 L262 188 H326" fill="none" stroke="#0F4C8A" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- pessoa num círculo -->
+      <circle cx="344" cy="112" r="70" fill="#7FD3F7"/>
+      <clipPath id="disc"><circle cx="344" cy="112" r="70"/></clipPath>
+      <g clip-path="url(#disc)">
+        <path d="M318 112 C314 78, 374 74, 370 112 L372 150 C360 158, 328 158, 316 150 Z" fill="#F2F2F2"/>
+        <path d="M290 192 C292 158, 396 158, 398 192 Z" fill="#27B4C4"/>
+        <path d="M322 160 C330 152, 358 152, 366 160 L362 168 C352 162, 336 162, 326 168 Z" fill="#1E9BAA"/>
+        <rect x="336" y="128" width="16" height="26" rx="7" fill="#B07A57"/>
+        <ellipse cx="344" cy="112" rx="18" ry="22" fill="#C68B63"/>
+        <path d="M325 104 C326 84, 364 82, 364 104 C356 94, 334 92, 325 104 Z" fill="#F2F2F2"/>
+      </g>
+    </svg>
+    <label class="field-label" for="email">Endereço de e-mail</label>
+    <div class="email-wrap">
+      <input class="email" id="email" type="email" placeholder="nome@empresa.com" autocomplete="email">
+      <button class="email-clear" id="emailClear" type="button" aria-label="Limpar" hidden><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.2"/></svg></button>
+    </div>
+    <div class="err" id="emailErr" role="alert"></div>
+  </div>
+  <div class="band"><button class="btn" id="createAccount">Criar conta</button><button class="btn primary" id="signIn">Entrar</button></div>
+</section>
+
+
+<!-- 2. Aguardando login -->
+<section class="step" id="s-wait">
+  <div class="body">
+    <div class="spinner" aria-hidden="true"></div>
+    <h1>Entre no navegador</h1>
+    <p id="waitText">Abrimos a página da Microsoft no seu navegador. Conclua o login por lá e volte para esta janela.</p>
+    <button class="link" id="reopen">Abrir o navegador de novo</button>
+    <div class="err" id="loginErr" role="alert"></div>
+  </div>
+  <div class="actions"><div class="dots"><i class="on"></i><i></i><i></i><i></i></div><div class="spacer"></div><button class="btn" id="back">Voltar</button></div>
+</section>
+
+<!-- 3. Unidade M: -->
+<section class="step flow" id="s-drive">
+  <div class="body">
+    <img class="art-sm" id="artIntro" alt="" hidden>
+    <h1>Seus arquivos ficam em <span id="letter">M:</span></h1>
+    <p>Tudo o que está no seu OneDrive e nas bibliotecas do SharePoint aparece nessa unidade, no Explorador de Arquivos.</p>
+    <div class="drive">
+      <div class="head"><img id="cloud2" alt=""><span>OneDrive 365 (<span id="letter2">M:</span>)</span></div>
+      <div class="row"><img id="cloud3" alt=""><span>Meu OneDrive<small>Seus arquivos pessoais do trabalho</small></span></div>
+      <div class="row"><img id="sp" alt=""><span>SharePoint<small>Bibliotecas que você sincronizar no SharePoint</small></span></div>
+    </div>
+    <div class="note"><svg><use href="#i-info"/></svg><span>Nada é baixado até você abrir. Os arquivos ocupam espaço no computador só quando são usados.</span></div>
+  </div>
+  <div class="foot"><div class="dots"><i></i><i class="on"></i><i></i><i></i></div><div class="status" id="driveStatus" role="status"></div><button class="btn primary" id="toFolders" disabled>Avançar</button></div>
+</section>
+
+<!-- 4. Pastas do PC -->
+<section class="step flow" id="s-folders">
+  <div class="body">
+    <img class="art-sm" id="artFolders" alt="" hidden>
+    <h1>Fazer backup das pastas deste PC</h1>
+    <p>As pastas escolhidas são copiadas para o Meu OneDrive. Use <svg style="width:14px;height:14px;vertical-align:-2px"><use href="#i-gear"/></svg> para escolher quais subpastas entram.</p>
+    <div class="folders" id="folderList"></div>
+  </div>
+  <div class="foot"><div class="dots"><i></i><i></i><i class="on"></i><i></i></div><div class="spacer"></div><button class="btn" id="skipFolders">Agora não</button><button class="btn primary" id="saveFolders">Iniciar backup</button></div>
+</section>
+
+<!-- 5. Pronto -->
+<section class="step flow" id="s-done">
+  <div class="body">
+    <img class="art-sm" id="artDone" alt="" hidden style="height:170px">
+    <div class="check" id="doneCheck"><svg><use href="#i-check"/></svg></div>
+    <h1>Tudo pronto</h1>
+    <p id="doneText">Seus arquivos estão na unidade M:. O ícone do OneDrive 365 fica perto do relógio: clique nele para ver o que está sincronizando.</p>
+  </div>
+  <div class="foot"><div class="dots"><i></i><i></i><i></i><i class="on"></i></div><div class="spacer"></div><button class="btn" id="close">Fechar</button><button class="btn primary" id="openDrive">Abrir minha unidade M:</button></div>
+</section>
+
+<div class="modal-back" id="pickBack" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+  <div class="modal">
+    <header><h2 id="pickTitle">Escolher pastas</h2><div class="muted">Desmarque as subpastas que não devem ir para o OneDrive. O que estiver dentro delas também fica de fora.</div></header>
+    <div class="tree" id="tree"></div>
+    <div class="foot"><span class="muted" id="pickCount"></span><button class="btn" id="pickCancel">Cancelar</button><button class="btn primary" id="pickSave">OK</button></div>
+  </div>
+</div>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const send = (cmd, args = {}) => chrome.webview.postMessage({ cmd, ...args });
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  let S = {}, picks = {};
+
+  function go(step) {
+    document.querySelectorAll(".step").forEach((s) => s.classList.toggle("active", s.id === "s-" + step));
+    const first = document.querySelector(`#s-${step} input.email`);   // só o campo de e-mail; foco em botão desenha o anel de teclado
+    if (first) first.focus();
+  }
+  function size(b) {
+    if (b == null) return "calculando…";
+    if (b >= 1 << 30) return (b / (1 << 30)).toFixed(1).replace(".", ",") + " GB";
+    if (b >= 1 << 20) return Math.round(b / (1 << 20)) + " MB";
+    return Math.max(1, Math.round(b / 1024)) + " KB";
+  }
+
+  $("#signIn").onclick = () => {
+    const email = $("#email").value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { $("#emailErr").textContent = "Digite um email válido, como nome@empresa.com."; $("#email").focus(); return; }
+    $("#emailErr").textContent = "";
+    $("#loginErr").textContent = "";
+    go("wait");
+    send("login", { email });
+  };
+  $("#email").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#signIn").click(); });
+  const syncClear = () => { $("#emailClear").hidden = !$("#email").value; };
+  $("#email").addEventListener("input", syncClear);
+  $("#emailClear").onclick = () => { $("#email").value = ""; syncClear(); $("#email").focus(); };
+  $("#createAccount").onclick = () => send("createAccount");
+  $("#reopen").onclick = () => send("reopen", { email: $("#email").value.trim() });
+  $("#back").onclick = () => { send("cancelLogin"); go("welcome"); };
+  let driveFailed = false;
+  $("#toFolders").onclick = () => {
+    if (driveFailed) { driveStatus("Preparando a unidade…"); $("#toFolders").disabled = true; send("retryDrive"); return; }
+    go("folders"); send("folders");
+  };
+  function driveStatus(text, bad) { $("#driveStatus").textContent = text; $("#driveStatus").classList.toggle("bad", !!bad); }
+  $("#skipFolders").onclick = () => { send("saveFolders", { ids: [] }); go("done"); };
+  $("#saveFolders").onclick = () => { send("saveFolders", { ids: Object.keys(picks).filter((k) => picks[k]) }); go("done"); };
+  $("#openDrive").onclick = () => send("openDrive");
+  $("#close").onclick = () => send("finish");
+  document.addEventListener("change", (e) => {
+    const f = e.target.dataset.folder;
+    if (!f) return;
+    picks[f] = e.target.checked;
+    if (e.target.checked && !(excl[f] || []).length) openPicker(f);   // ligou: já mostra as subpastas para escolher
+  });
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-pick],[data-tw]");
+    if (!t) return;
+    if (t.dataset.pick) openPicker(t.dataset.pick);
+    else toggleNode(t.dataset.tw, t);
+  });
+
+  // ---- Escolher subpastas (mesmo modelo da janela principal): excluded = subpastas fora do backup ----
+  let pick = null, excl = {};
+  const icon = (n) => `<svg><use href="#i-${n}"/></svg>`;
+  const isOff = (rel) => [...pick.excluded].some((x) => rel === x || rel.startsWith(x + "/"));
+  const ancestorOff = (rel) => [...pick.excluded].some((x) => rel.startsWith(x + "/"));
+  const partial = (rel) => [...pick.excluded].some((x) => x.startsWith(rel + "/"));
+  function openPicker(id) {
+    const f = S.folders.find((x) => x.id === id);
+    pick = { id, excluded: new Set(excl[id] || []), loaded: new Set() };
+    $("#pickTitle").textContent = `Escolher pastas de ${f.name}`;
+    $("#tree").innerHTML = `<div class="kids" data-kids=""><div class="node muted">Carregando…</div></div>`;
+    $("#pickBack").classList.add("open");
+    updateCount();
+    send("listDirs", { id, rel: "" });
+  }
+  function nodeHtml(d) {
+    return `<div><div class="node">
+        <button class="tw ${d.hasChildren ? "" : "none"}" data-tw="${esc(d.rel)}" aria-label="Expandir">${icon("chevr")}</button>
+        <input type="checkbox" data-chk="${esc(d.rel)}">
+        <svg class="f"><use href="#i-folderfill"/></svg><span class="nm" title="${esc(d.rel)}">${esc(d.name)}</span>
+      </div><div class="kids" data-kids="${esc(d.rel)}" style="padding-left:22px" hidden></div></div>`;
+  }
+  function toggleNode(rel, btn) {
+    const kids = document.querySelector(`[data-kids="${CSS.escape(rel)}"]`);
+    const open = kids.hidden;
+    kids.hidden = !open;
+    btn.classList.toggle("open", open);
+    if (open && !pick.loaded.has(rel)) { kids.innerHTML = `<div class="node muted">Carregando…</div>`; send("listDirs", { id: pick.id, rel }); }
+  }
+  function refreshChecks() {
+    document.querySelectorAll("[data-chk]").forEach((c) => {
+      const rel = c.dataset.chk;
+      c.checked = !isOff(rel);
+      c.disabled = ancestorOff(rel);
+      c.indeterminate = !isOff(rel) && partial(rel);
+      c.closest(".node").classList.toggle("off", isOff(rel));
+    });
+    updateCount();
+  }
+  function updateCount() {
+    const n = pick ? pick.excluded.size : 0;
+    $("#pickCount").textContent = n ? `${n} pasta(s) fora do backup` : "Todas as subpastas vão para o OneDrive";
+  }
+  document.addEventListener("change", (e) => {
+    const rel = e.target.dataset.chk;
+    if (rel == null || !pick) return;
+    if (e.target.checked) pick.excluded.delete(rel);
+    else {
+      [...pick.excluded].filter((x) => x.startsWith(rel + "/")).forEach((x) => pick.excluded.delete(x));
+      pick.excluded.add(rel);
+    }
+    refreshChecks();
+  });
+  $("#pickCancel").onclick = () => { $("#pickBack").classList.remove("open"); pick = null; };
+  $("#pickSave").onclick = () => {
+    excl[pick.id] = [...pick.excluded];
+    send("saveExclusions", { id: pick.id, excluded: excl[pick.id] });
+    $("#pickBack").classList.remove("open");
+    pick = null;
+    renderFolders();
+  };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && pick) $("#pickCancel").click(); });
+
+  function renderFolders() {
+    $("#folderList").innerHTML = (S.folders || []).map((f) => `
+      <div class="frow">${f.icon ? `<img src="${f.icon}" alt="">` : "<span></span>"}
+        <span><span class="n">${esc(f.name)}</span><br><small>${esc(f.path)}</small></span>
+        <small class="${(excl[f.id] || []).length ? "ex" : ""}">${(excl[f.id] || []).length ? `${excl[f.id].length} fora · ` : ""}${size(f.size)}</small>
+        <button class="gear" data-pick="${esc(f.id)}" title="Escolher subpastas" aria-label="Escolher subpastas de ${esc(f.name)}">${icon("gear")}</button>
+        <label class="switch"><input type="checkbox" data-folder="${esc(f.id)}" ${picks[f.id] ? "checked" : ""} aria-label="Backup de ${esc(f.name)}"><span></span></label>
+      </div>`).join("");
+  }
+
+  chrome.webview.addEventListener("message", (e) => {
+    const m = e.data;
+    if (m.type === "init") {
+      S = m;
+      ["#cloud2", "#cloud3"].forEach((s) => { if ($(s)) $(s).src = m.cloudIcon; });
+      $("#sp").src = m.sharePointIcon;
+      $("#letter").textContent = $("#letter2").textContent = m.letter;
+      $("#openDrive").textContent = `Abrir minha unidade ${m.letter}`;
+      $("#doneText").textContent = `Seus arquivos estão na unidade ${m.letter}. O ícone do OneDrive 365 fica perto do relógio: clique nele para ver o que está sincronizando.`;
+      if (m.email) { $("#email").value = m.email; $("#emailClear").hidden = false; }
+      const art = m.art || {};
+      const useArt = (id, src, fallback) => { if (!src) return; $(id).src = src; $(id).hidden = false; if (fallback) $(fallback).style.display = "none"; };
+      useArt("#artLogin", art.login, "#artLoginOwn");
+      useArt("#artIntro", art.intro);
+      useArt("#artFolders", art.folders);
+      useArt("#artDone", art.done, "#doneCheck");
+      go(m.step || "welcome");
+    }
+    if (m.type === "loginFailed") { go("welcome"); $("#emailErr").textContent = m.error; }
+    if (m.type === "loggedIn") { go("drive"); driveStatus("Preparando a unidade…"); }
+    if (m.type === "driveReady") { driveFailed = false; driveStatus(""); $("#toFolders").textContent = "Avançar"; $("#toFolders").disabled = false; }
+    if (m.type === "driveFailed") {
+      driveFailed = true;
+      driveStatus("Não foi possível montar a unidade. Veja os detalhes em Preferências → Registros.", true);
+      $("#driveStatus").title = m.error || "";
+      $("#toFolders").textContent = "Tentar de novo";
+      $("#toFolders").disabled = false;
+    }
+    if (m.type === "folders") {
+      S.folders = m.folders;
+      m.folders.forEach((f) => { if (!(f.id in excl)) excl[f.id] = f.excluded || []; });
+      renderFolders();
+    }
+    if (m.type === "dirs" && pick && m.payload.id === pick.id) {
+      const box = document.querySelector(`[data-kids="${CSS.escape(m.payload.rel)}"]`);
+      if (box) {
+        pick.loaded.add(m.payload.rel);
+        box.innerHTML = m.payload.dirs.length ? m.payload.dirs.map(nodeHtml).join("") : `<div class="node muted">Sem subpastas</div>`;
+        refreshChecks();
+      }
+    }
+  });
+  send("ready");
+</script>
+</body>
+</html>

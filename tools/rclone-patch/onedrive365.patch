@@ -1,0 +1,94 @@
+diff --git a/backend/union/union.go b/backend/union/union.go
+index 1cb0942..f03f485 100644
+--- a/backend/union/union.go
++++ b/backend/union/union.go
+@@ -1007,6 +1007,16 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
+ 	// If any of upstreams are SlowHash, propagate it
+ 	features.SlowHash = slowHash
+ 
++	// Enable ChangeNotify when any upstream supports it. Mask drops it
++	// if one upstream (eg a local overlay) can't notify, which would stop
++	// all polling for the remotes that can.
++	for _, u := range upstreams {
++		if u.Features().ChangeNotify != nil {
++			features.ChangeNotify = f.ChangeNotify
++			break
++		}
++	}
++
+ 	// Enable ListR when upstreams either support ListR or is local
+ 	// But not when all upstreams are local
+ 	if features.ListR == nil {
+diff --git a/cmd/cmount/fs.go b/cmd/cmount/fs.go
+index 47d23df..68031a8 100644
+--- a/cmd/cmount/fs.go
++++ b/cmd/cmount/fs.go
+@@ -157,6 +157,7 @@ func (fsys *FS) stat(node vfs.Node, stat *fuse.Stat_t) (errc int) {
+ 	stat.Blksize = 512
+ 	stat.Blocks = int64(Blocks)
+ 	stat.Birthtim = t
++	stat.Flags = winFlags(node)
+ 	// fs.Debugf(nil, "stat = %+v", *stat)
+ 	return 0
+ }
+diff --git a/cmd/cmount/winflags.go b/cmd/cmount/winflags.go
+new file mode 100644
+index 0000000..8f8e7ab
+--- /dev/null
++++ b/cmd/cmount/winflags.go
+@@ -0,0 +1,55 @@
++//go:build cmount && ((linux && cgo) || (darwin && cgo) || (freebsd && cgo) || (openbsd && cgo) || windows)
++
++package cmount
++
++import (
++	"os"
++	"strings"
++
++	"github.com/rclone/rclone/vfs"
++	"github.com/winfsp/cgofuse/fuse"
++)
++
++// Windows only shows a folder's desktop.ini icon when the folder has the
++// read-only (or system) attribute and desktop.ini is hidden+system.
++//
++// RCLONE_CMOUNT_ICON_DIRS lists the folders that get the read-only flag,
++// separated by "|". A trailing "/*" means "every direct child of".
++// Only these folders are flagged so Explorer doesn't probe desktop.ini
++// (and list the remote) in every folder of the mount.
++var iconDirs, iconParents = parseIconDirs(os.Getenv("RCLONE_CMOUNT_ICON_DIRS"))
++
++func parseIconDirs(env string) (dirs, parents map[string]bool) {
++	dirs, parents = map[string]bool{}, map[string]bool{}
++	for _, p := range strings.Split(env, "|") {
++		p = strings.ToLower(strings.Trim(strings.ReplaceAll(p, "\\", "/"), "/"))
++		if p == "" {
++			continue
++		}
++		if parent, ok := strings.CutSuffix(p, "/*"); ok {
++			parents[parent] = true
++		} else {
++			dirs[p] = true
++		}
++	}
++	return dirs, parents
++}
++
++// winFlags returns the BSD (Windows attribute) flags for node
++func winFlags(node vfs.Node) uint32 {
++	if node.IsDir() {
++		p := strings.ToLower(strings.Trim(node.Path(), "/"))
++		parent := ""
++		if i := strings.LastIndex(p, "/"); i >= 0 {
++			parent = p[:i]
++		}
++		if iconDirs[p] || (p != "" && iconParents[parent]) {
++			return fuse.UF_READONLY
++		}
++		return 0
++	}
++	if strings.EqualFold(node.Name(), "desktop.ini") {
++		return fuse.UF_HIDDEN | fuse.UF_SYSTEM
++	}
++	return 0
++}

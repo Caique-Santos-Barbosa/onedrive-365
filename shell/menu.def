@@ -1,0 +1,4 @@
+LIBRARY OneDrive365Menu
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

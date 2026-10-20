@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>OneDrive365</AssemblyName>
+    <RootNamespace>HdtDrive</RootNamespace>
+    <ApplicationIcon>assets\app.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>1.1.0</Version>
+    <Product>OneDrive 365</Product>
+    <Company>Caique Santos Barbosa</Company>
+    <Authors>Caique Santos Barbosa</Authors>
+    <Copyright>© 2026 Caique Santos Barbosa</Copyright>
+    <Description>OneDrive e SharePoint como unidade sob demanda (não é um produto Microsoft)</Description>
+
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- O pacote WebView2 traz uma DLL de WPF (não usada) que gera conflito de WindowsBase -->
+    <MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="assets\rclone.exe" LogicalName="rclone.exe" />
+    <EmbeddedResource Include="assets\winfsp.msi" LogicalName="winfsp.msi" />
+    <EmbeddedResource Include="assets\app.ico" LogicalName="app.ico" />
+    <EmbeddedResource Include="assets\drive.ico" LogicalName="drive.ico" />
+    <EmbeddedResource Include="ui\ui.html" LogicalName="ui.html" />
+    <EmbeddedResource Include="assets\sharepoint.ico" LogicalName="sharepoint.ico" />
+    <EmbeddedResource Include="assets\OneDrive365Menu.dll" LogicalName="OneDrive365Menu.dll" />
+    <EmbeddedResource Include="assets\OneDrive365.msix" LogicalName="OneDrive365.msix" />
+    <EmbeddedResource Include="assets\menu.cer" LogicalName="menu.cer" />
+    <EmbeddedResource Include="assets\menu-version.txt" LogicalName="menu-version.txt" />
+    <EmbeddedResource Include="ui\share.html" LogicalName="share.html" />
+    <EmbeddedResource Include="ui\flyout.html" LogicalName="flyout.html" />
+    <EmbeddedResource Include="ui\wizard.html" LogicalName="wizard.html" />
+    <EmbeddedResource Include="assets\menuicons\*.ico" LogicalName="menuicons.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="assets\foldercolors\*.ico" LogicalName="foldercolors.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="assets\OneDrive365Shell.dll" LogicalName="OneDrive365Shell.dll" />
+    <EmbeddedResource Include="assets\overlay-sync.ico" LogicalName="overlay-sync.ico" />
+    <EmbeddedResource Include="assets\overlay-local.ico" LogicalName="overlay-local.ico" />
+    <EmbeddedResource Include="assets\overlay-cloud.ico" LogicalName="overlay-cloud.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+  </ItemGroup>
+
+</Project>
+
+
