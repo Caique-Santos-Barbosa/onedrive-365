@@ -31,18 +31,31 @@ index 47d23df..68031a8 100644
  	// fs.Debugf(nil, "stat = %+v", *stat)
  	return 0
  }
+diff --git a/cmd/cmount/mount.go b/cmd/cmount/mount.go
+index 6515b33..2749fb6 100644
+--- a/cmd/cmount/mount.go
++++ b/cmd/cmount/mount.go
+@@ -136,6 +136,7 @@ func mount(VFS *vfs.VFS, mountPath string, opt *mountlib.Options) (<-chan error,
+ 	// Create underlying FS
+ 	fsys := NewFS(VFS, opt)
+ 	host := fuse.NewFileSystemHost(fsys)
++	setNotifyHost(host)
+ 	host.SetCapReaddirPlus(true) // only works on Windows
+ 	if opt.CaseInsensitive.Valid {
+ 		host.SetCapCaseInsensitive(opt.CaseInsensitive.Value)
 diff --git a/cmd/cmount/winflags.go b/cmd/cmount/winflags.go
 new file mode 100644
-index 0000000..d6d526f
+index 0000000..7b97fbd
 --- /dev/null
 +++ b/cmd/cmount/winflags.go
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,163 @@
 +//go:build cmount && ((linux && cgo) || (darwin && cgo) || (freebsd && cgo) || (openbsd && cgo) || windows)
 +
 +package cmount
 +
 +import (
 +	"context"
++	"errors"
 +	"os"
 +	"strings"
 +	"sync"
@@ -64,6 +77,58 @@ index 0000000..d6d526f
 +    rclone rc mount/icondirs dirs="Docs|Shared/*"
 +`,
 +	})
++}
++
++var (
++	notifyMu   sync.Mutex
++	notifyHost *fuse.FileSystemHost
++)
++
++// setNotifyHost remembers the mounted host so rc can send change notifications
++func setNotifyHost(host *fuse.FileSystemHost) {
++	notifyMu.Lock()
++	defer notifyMu.Unlock()
++	notifyHost = host
++}
++
++func init() {
++	rc.Add(rc.Call{
++		Path:  "mount/notify",
++		Fn:    rcNotify,
++		Title: "Send file system change notifications for paths.",
++		Help: `
++Tells the operating system that the given paths changed, as a local file
++system would. Explorer uses these to drop cached folder customizations
++(desktop.ini) and icons. Paths are separated by "|".
++
++    rclone rc mount/notify paths="Docs|Docs/desktop.ini"
++`,
++	})
++}
++
++// rcNotify sends a "modified" notification (attributes, times, size) for each path
++func rcNotify(ctx context.Context, in rc.Params) (rc.Params, error) {
++	list, err := in.GetString("paths")
++	if err != nil {
++		return nil, err
++	}
++	notifyMu.Lock()
++	host := notifyHost
++	notifyMu.Unlock()
++	if host == nil {
++		return nil, errors.New("not mounted")
++	}
++	sent := 0
++	for _, p := range strings.Split(list, "|") {
++		p = strings.Trim(strings.ReplaceAll(strings.TrimSpace(p), "\\", "/"), "/")
++		if p == "" {
++			continue
++		}
++		if host.Notify("/"+p, fuse.NOTIFY_CHMOD|fuse.NOTIFY_CHFLAGS|fuse.NOTIFY_UTIME|fuse.NOTIFY_TRUNCATE) {
++			sent++
++		}
++	}
++	return rc.Params{"sent": sent}, nil
 +}
 +
 +// rcIconDirs replaces the folder list with the "dirs" parameter

@@ -168,32 +168,50 @@ sealed partial class TrayApp
 
         using var dlg = new FolderColorDialog(Path.GetFileName(path), current);
         if (dlg.ShowDialog() != DialogResult.OK || dlg.Selected == current) return;
-        Log.Info($"Cor da pasta {path}: {dlg.Selected}");
+        await ApplyFolderColor(path, dlg.Selected);
+    }
 
+    /// Aplica a cor (também usado pelo diagnóstico "setcolor:<cor>|<caminho>" da pipe) e registra o tempo de cada etapa.
+    async Task ApplyFolderColor(string path, string color)
+    {
+        path = path.TrimEnd('\\');
+        var drive = _settings.DriveLetter + "\\";
+        var inDrive = path.StartsWith(drive, StringComparison.OrdinalIgnoreCase);
+        var key = inDrive ? path[drive.Length..].Replace('\\', '/') : null;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         if (inDrive)
         {
-            if (dlg.Selected == "yellow") _settings.FolderColors.Remove(key!);
-            else _settings.FolderColors[key!] = dlg.Selected;
+            if (color == "yellow") _settings.FolderColors.Remove(key!);
+            else _settings.FolderColors[key!] = color;
             _settings.Save();
             ShellIntegration.SetColors(_settings.FolderColors);   // icon-dirs.txt: vale também para as próximas montagens
-            ShellIntegration.WriteColorIni(key!, dlg.Selected);
+            ShellIntegration.WriteColorIni(key!, color);
+            var tFiles = sw.ElapsedMilliseconds;
             // Só a própria pasta: remontar faria o Explorer aberto no M: perder os ícones de tudo, e reler a mãe
             // custa uma ida à nuvem (~0,5 s) sem mudar nada (o atributo vem do rclone na hora)
-            if (!await _rclone.SetIconDirs(ShellIntegration.IconDirs) || !await _rclone.RefreshDirs(key!)) { await ApplyLibraries(); return; }
-            // Atributos + desktop.ini + pasta, entregues já (SHCNF_FLUSH): medido ~0,4 s até o Explorer redesenhar
+            // Nunca remonta por causa de cor: remontar bagunça os ícones de todo Explorer aberto no M:.
+            // Se o rclone falhar aqui, a cor já está gravada e vale na próxima listagem/montagem.
+            if (!await _rclone.SetIconDirs(ShellIntegration.IconDirs) | !await _rclone.RefreshDirs(key!))
+                Log.Info($"Cor da pasta {path}: {color} (rclone não confirmou; aplicada na próxima listagem)");
+            // Aviso de sistema de arquivos (o que faz o Explorer largar o desktop.ini antigo na hora)
+            await _rclone.NotifyChanged(key!, key + "/desktop.ini");
+            var tRclone = sw.ElapsedMilliseconds;
+            // Atributos + desktop.ini + pasta, entregues já (SHCNF_FLUSH)
             await Task.Run(() =>
             {
                 SHChangeNotify(0x00000800 /* SHCNE_ATTRIBUTES */, 0x1005 /* SHCNF_PATHW | SHCNF_FLUSH */, path, IntPtr.Zero);
                 SHChangeNotify(0x00002000 /* SHCNE_UPDATEITEM */, 0x1005, Path.Combine(path, "desktop.ini"), IntPtr.Zero);
                 SHChangeNotify(0x00002000 /* SHCNE_UPDATEITEM */, 0x1005, path, IntPtr.Zero);
             });
+            Log.Info($"Cor da pasta {path}: {color} em {sw.ElapsedMilliseconds} ms (arquivos {tFiles}, rclone {tRclone - tFiles}, Explorer {sw.ElapsedMilliseconds - tRclone})");
             return;
         }
+        Log.Info($"Cor da pasta {path}: {color}");
 
         var ini = Path.Combine(path, "desktop.ini");
         if (File.Exists(ini)) File.SetAttributes(ini, FileAttributes.Normal);
         WritePrivateProfileString(".ShellClassInfo", "IconResource",
-            dlg.Selected == "yellow" ? null : $"{ShellIntegration.ColorIcon(dlg.Selected)},0", ini);
+            color == "yellow" ? null : $"{ShellIntegration.ColorIcon(color)},0", ini);
         if (File.Exists(ini)) File.SetAttributes(ini, FileAttributes.Hidden | FileAttributes.System);
         // O Windows só lê o desktop.ini de pastas marcadas como somente leitura
         File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);

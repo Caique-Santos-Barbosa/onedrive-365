@@ -177,6 +177,13 @@ sealed partial class TrayApp : ApplicationContext
             return;
         }
         if (msg == "quit") { await Quit(confirm: false); return; }
+        if (msg.StartsWith("setcolor:"))   // diagnóstico: setcolor:<cor>|<caminho> (mesmo código do "Cor da pasta", sem a janela)
+        {
+            await _ready.Task;
+            var parts = msg["setcolor:".Length..].Split('|', 2);
+            await ApplyFolderColor(parts[1], parts[0]);
+            return;
+        }
         if (msg == "add-all") { await _ready.Task; await AddAll(); return; }
         if (msg.StartsWith("backup:")) { await _ready.Task; _backup!.SetEnabled(msg["backup:".Length..], true); return; }
         if (msg.StartsWith("action:"))

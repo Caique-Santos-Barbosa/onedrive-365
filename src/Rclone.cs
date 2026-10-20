@@ -23,6 +23,8 @@ sealed class Rclone
     bool _stopping;
     int _rcPort;
     readonly HttpClient _rc = new() { Timeout = TimeSpan.FromSeconds(5) };
+    // Releitura de pasta vai à nuvem e, com o cache frio (logo depois de montar), passa fácil de 5 s
+    readonly HttpClient _rcSlow = new() { Timeout = TimeSpan.FromSeconds(60) };
 
     public event Action<string>? MountDied;
     public bool Running => _mount is { HasExited: false };
@@ -184,6 +186,8 @@ sealed class Rclone
         var pass = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
         _rc.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{user}:{pass}")));
+        _rcSlow.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{user}:{pass}")));
 
         Directory.CreateDirectory(Paths.LogsDir);
         var psi = new ProcessStartInfo(Paths.Rclone) { UseShellExecute = false, CreateNoWindow = true };
@@ -293,6 +297,20 @@ sealed class Rclone
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { Log.Error("mount/icondirs", e); return false; }
     }
 
+    /// Avisa o Windows, como um disco local faria, que estes caminhos mudaram (mount/notify, patch nosso).
+    /// Sem isso o Explorer guarda o desktop.ini antigo por minutos: o rclone não emite avisos do sistema de arquivos.
+    public async Task<bool> NotifyChanged(params string[] paths)
+    {
+        if (!Running || paths.Length == 0) return false;
+        try
+        {
+            var body = JsonSerializer.Serialize(new { paths = string.Join("|", paths.Select(p => p.Replace('\\', '/').Trim('/'))) });
+            var r = await _rc.PostAsync($"http://127.0.0.1:{_rcPort}/mount/notify", new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+            return r.StatusCode == HttpStatusCode.OK;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { Log.Error("mount/notify", e); return false; }
+    }
+
     /// Relê do remoto só estas pastas (caminhos relativos à unidade), sem remontar.
     public async Task<bool> RefreshDirs(params string[] dirs)
     {
@@ -301,7 +319,7 @@ sealed class Rclone
         for (var i = 0; i < dirs.Length; i++) args[i == 0 ? "dir" : $"dir{i + 1}"] = dirs[i].Replace('\\', '/').Trim('/');
         try
         {
-            var r = await _rc.PostAsync($"http://127.0.0.1:{_rcPort}/vfs/refresh", new StringContent(JsonSerializer.Serialize(args), System.Text.Encoding.UTF8, "application/json"));
+            var r = await _rcSlow.PostAsync($"http://127.0.0.1:{_rcPort}/vfs/refresh", new StringContent(JsonSerializer.Serialize(args), System.Text.Encoding.UTF8, "application/json"));
             if (r.StatusCode == HttpStatusCode.OK) return true;
             Log.Info($"vfs/refresh {string.Join(", ", dirs)}: {(int)r.StatusCode} {await r.Content.ReadAsStringAsync()}");
             return false;
