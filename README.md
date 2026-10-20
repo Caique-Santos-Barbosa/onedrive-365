@@ -52,15 +52,16 @@ Analisamos como o Google Drive para desktop funciona por dentro (`GoogleDriveFS.
 
 1. **Unidade sob demanda.** O `rclone mount` com `--vfs-cache-mode full` sobre o WinFsp. A nuvem só é consultada quando você abre uma pasta, e o arquivo só desce quando você o abre. O cache local vai até 20 GB, e o que não é usado há 7 dias sai sozinho.
 2. **Uma unidade, dois mundos.** Remotes `combine` + `union` juntam o **Meu OneDrive** e as **bibliotecas do SharePoint** em `M:`, com um único login.
-3. **Botão "Sincronizar" do SharePoint.** O app se registra como dono do protocolo `odopen://`, resolve a biblioteca pelo Microsoft Graph e a coloca em `M:\SharePoint` em ~1 segundo, sem processar nada. Outros links `odopen://` continuam indo para o OneDrive original.
-4. **Patch no rclone** (`tools/rclone-patch`). Atributos de pasta para o Windows mostrar ícones próprios, e notificação de mudanças funcionando também na união de remotes.
-5. **Backup das pastas do PC, só de envio.** Área de Trabalho, Documentos, Imagens, Downloads, Músicas, Vídeos e pastas extras são copiadas para o Meu OneDrive, com 16 envios em paralelo e envio imediato de cada arquivo alterado. **Nada é baixado para o PC.** Uma ⚙ por pasta permite escolher as subpastas.
-6. **Integração com o Windows igual à do OneDrive:**
+3. **Botão "Sincronizar" do SharePoint.** O app se registra como dono do protocolo `odopen://`, resolve a biblioteca pelo Microsoft Graph e a coloca em `M:\SharePoint` em ~1 segundo, sem processar nada. Outros links `odopen://` continuam indo para o OneDrive original. Também dá para escolher, numa lista só, quais bibliotecas que a conta acessa entram na unidade.
+4. **Qualquer conta, qualquer tenant.** Ao trocar de conta ("Desvincular este PC"), bibliotecas que a conta nova não acessa saem sozinhas e o histórico da conta anterior é apagado.
+5. **Patch no rclone** (`tools/rclone-patch`). Atributos de pasta para o Windows mostrar ícones próprios, e notificação de mudanças funcionando também na união de remotes.
+6. **Backup das pastas do PC, só de envio.** Área de Trabalho, Documentos, Imagens, Downloads, Músicas, Vídeos e pastas extras são copiadas para o Meu OneDrive, com 16 envios em paralelo e envio imediato de cada arquivo alterado. **Nada é baixado para o PC.** Uma ⚙ por pasta permite escolher as subpastas.
+7. **Integração com o Windows igual à do OneDrive:**
    - selos de status nos arquivos (extensão de shell em C++);
    - menu do botão direito no Windows 11 e em "Mostrar mais opções" (pacote MSIX esparso), com Compartilhar, Copiar link, Gerenciar acesso, Exibir online e Cor da pasta;
-   - ícone na bandeja com animação de sincronização e painel igual ao do OneDrive;
+   - ícone na bandeja com animação de sincronização e painel igual ao do OneDrive, com Pausar, Desvincular este PC e Sair;
    - assistente de instalação com as ilustrações do próprio OneDrive.
-7. **Instalador único.** Um só `.exe` (~98 MB) traz o .NET, o rclone, o WinFsp, as extensões de shell e a interface. Ele pede o administrador uma única vez.
+8. **Instalador único.** Um só `.exe` (~98 MB) traz o .NET, o rclone, o WinFsp, as extensões de shell e a interface. Ele pede o administrador uma única vez.
 
 ---
 
@@ -79,6 +80,8 @@ Analisamos como o Google Drive para desktop funciona por dentro (`GoogleDriveFS.
 | ![](docs/screenshots/02-activity.png) | ![](docs/screenshots/a2-atividade-enviando.png) |
 | **Pastas do computador** (⚙ escolhe subpastas) | **SharePoint** |
 | ![](docs/screenshots/04-folders.png) | ![](docs/screenshots/05-sharepoint.png) |
+| **Adicionar bibliotecas que eu acesso** (triagem) | **Sobre** |
+| ![](docs/screenshots/17-bibliotecas.png) | ![](docs/screenshots/07-about.png) |
 | **Notificações** | **Preferências** (horário de sincronização) |
 | ![](docs/screenshots/03-notifications.png) | ![](docs/screenshots/06-preferences.png) |
 
@@ -91,10 +94,10 @@ Analisamos como o Google Drive para desktop funciona por dentro (`GoogleDriveFS.
 | Entrar | Unidade M: | Backup das pastas |
 |---|---|---|
 | ![](docs/screenshots/12-assistente-welcome.png) | ![](docs/screenshots/13-assistente-drive.png) | ![](docs/screenshots/14-assistente-folders.png) |
-| **Escolher subpastas** | **Tudo pronto** | |
+| **Escolher subpastas** | **Tudo pronto** (← para voltar) | |
 | ![](docs/screenshots/15-assistente-pick.png) | ![](docs/screenshots/16-assistente-done.png) | |
 
-<sub>Informações sensíveis (caminhos, nomes de pastas, e-mail) foram tarjadas.</sub>
+<sub>Informações sensíveis (caminhos, nomes de pastas, e-mail, endereços de sites) foram tarjadas.</sub>
 
 ---
 
