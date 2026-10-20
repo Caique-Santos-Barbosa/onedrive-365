@@ -33,23 +33,50 @@ index 47d23df..68031a8 100644
  }
 diff --git a/cmd/cmount/winflags.go b/cmd/cmount/winflags.go
 new file mode 100644
-index 0000000..7462ab3
+index 0000000..d6d526f
 --- /dev/null
 +++ b/cmd/cmount/winflags.go
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,110 @@
 +//go:build cmount && ((linux && cgo) || (darwin && cgo) || (freebsd && cgo) || (openbsd && cgo) || windows)
 +
 +package cmount
 +
 +import (
++	"context"
 +	"os"
 +	"strings"
 +	"sync"
 +	"time"
 +
++	"github.com/rclone/rclone/fs/rc"
 +	"github.com/rclone/rclone/vfs"
 +	"github.com/winfsp/cgofuse/fuse"
 +)
++
++func init() {
++	rc.Add(rc.Call{
++		Path:  "mount/icondirs",
++		Fn:    rcIconDirs,
++		Title: "Set the folders that get the read-only attribute.",
++		Help: `
++Replaces the RCLONE_CMOUNT_ICON_DIRS list immediately, e.g.
++
++    rclone rc mount/icondirs dirs="Docs|Shared/*"
++`,
++	})
++}
++
++// rcIconDirs replaces the folder list with the "dirs" parameter
++func rcIconDirs(ctx context.Context, in rc.Params) (rc.Params, error) {
++	list, err := in.GetString("dirs")
++	if err != nil {
++		return nil, err
++	}
++	iconMu.Lock()
++	defer iconMu.Unlock()
++	iconDirs, iconParents = parseIconDirs(list)
++	return rc.Params{}, nil
++}
 +
 +// Windows only shows a folder's desktop.ini icon when the folder has the
 +// read-only (or system) attribute and desktop.ini is hidden+system.

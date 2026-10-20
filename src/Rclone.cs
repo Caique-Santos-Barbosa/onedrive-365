@@ -275,6 +275,19 @@ sealed class Rclone
         catch (TaskCanceledException) { return null; }
     }
 
+    /// Troca na hora a lista de pastas com ícone (mount/icondirs, patch nosso), sem remontar.
+    public async Task<bool> SetIconDirs(string list)
+    {
+        if (!Running) return false;
+        try
+        {
+            var r = await _rc.PostAsync($"http://127.0.0.1:{_rcPort}/mount/icondirs",
+                new StringContent(JsonSerializer.Serialize(new { dirs = list }), System.Text.Encoding.UTF8, "application/json"));
+            return r.StatusCode == HttpStatusCode.OK;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { Log.Error("mount/icondirs", e); return false; }
+    }
+
     /// Relê do remoto só estas pastas (caminhos relativos à unidade), sem remontar.
     public async Task<bool> RefreshDirs(params string[] dirs)
     {

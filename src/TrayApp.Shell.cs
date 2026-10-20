@@ -175,12 +175,11 @@ sealed partial class TrayApp
             if (dlg.Selected == "yellow") _settings.FolderColors.Remove(key!);
             else _settings.FolderColors[key!] = dlg.Selected;
             _settings.Save();
-            ShellIntegration.SetColors(_settings.FolderColors);   // atualiza icon-dirs.txt (o rclone relê em até 1 s)
+            ShellIntegration.SetColors(_settings.FolderColors);   // icon-dirs.txt: vale também para as próximas montagens
             ShellIntegration.WriteColorIni(key!, dlg.Selected);
-            await Task.Delay(1200);
             var parent = key!.Contains('/') ? key[..key.LastIndexOf('/')] : "";
             // Só a pasta e a mãe: remontar faria o Explorer aberto no M: perder os ícones de tudo
-            if (!await _rclone.RefreshDirs(key, parent)) { await ApplyLibraries(); return; }
+            if (!await _rclone.SetIconDirs(ShellIntegration.IconDirs) || !await _rclone.RefreshDirs(key, parent)) { await ApplyLibraries(); return; }
             SHChangeNotify(0x00002000 /* SHCNE_UPDATEITEM */, 0x0005 /* SHCNF_PATHW */, path, IntPtr.Zero);
             SHChangeNotify(0x00001000 /* SHCNE_UPDATEDIR */, 0x0005 /* SHCNF_PATHW */, Path.GetDirectoryName(path)!, IntPtr.Zero);
             return;
