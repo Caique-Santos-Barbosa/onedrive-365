@@ -111,7 +111,7 @@ sealed partial class TrayApp
     async Task HandleShellAction(string action, string path)
     {
         await _ready.Task;
-        if (action == "color") { SetFolderColor(path); return; }
+        if (action == "color") { await SetFolderColor(path); return; }
         await LoadAccountAsync(force: false);
         var cloud = CloudPath(path);
         var item = cloud == null ? null : await Graph.Item(cloud);
@@ -156,7 +156,7 @@ sealed partial class TrayApp
     }
 
     /// "Cor da pasta": no PC, desktop.ini direto na pasta; no M:, desktop.ini no overlay (exige remontar a unidade).
-    void SetFolderColor(string path)
+    async Task SetFolderColor(string path)
     {
         path = path.TrimEnd('\\');
         var drive = _settings.DriveLetter + "\\";
@@ -174,8 +174,15 @@ sealed partial class TrayApp
         {
             if (dlg.Selected == "yellow") _settings.FolderColors.Remove(key!);
             else _settings.FolderColors[key!] = dlg.Selected;
-            ShellIntegration.SetColors(_settings.FolderColors);
-            _ = ApplyLibraries();   // reescreve o overlay e remonta (~2 s)
+            _settings.Save();
+            ShellIntegration.SetColors(_settings.FolderColors);   // atualiza icon-dirs.txt (o rclone relê em até 1 s)
+            ShellIntegration.WriteColorIni(key!, dlg.Selected);
+            await Task.Delay(1200);
+            var parent = key!.Contains('/') ? key[..key.LastIndexOf('/')] : "";
+            // Só a pasta e a mãe: remontar faria o Explorer aberto no M: perder os ícones de tudo
+            if (!await _rclone.RefreshDirs(key, parent)) { await ApplyLibraries(); return; }
+            SHChangeNotify(0x00002000 /* SHCNE_UPDATEITEM */, 0x0005 /* SHCNF_PATHW */, path, IntPtr.Zero);
+            SHChangeNotify(0x00001000 /* SHCNE_UPDATEDIR */, 0x0005 /* SHCNF_PATHW */, Path.GetDirectoryName(path)!, IntPtr.Zero);
             return;
         }
 

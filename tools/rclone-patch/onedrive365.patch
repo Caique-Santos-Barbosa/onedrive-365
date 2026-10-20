@@ -33,10 +33,10 @@ index 47d23df..68031a8 100644
  }
 diff --git a/cmd/cmount/winflags.go b/cmd/cmount/winflags.go
 new file mode 100644
-index 0000000..8f8e7ab
+index 0000000..7462ab3
 --- /dev/null
 +++ b/cmd/cmount/winflags.go
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,83 @@
 +//go:build cmount && ((linux && cgo) || (darwin && cgo) || (freebsd && cgo) || (openbsd && cgo) || windows)
 +
 +package cmount
@@ -44,6 +44,8 @@ index 0000000..8f8e7ab
 +import (
 +	"os"
 +	"strings"
++	"sync"
++	"time"
 +
 +	"github.com/rclone/rclone/vfs"
 +	"github.com/winfsp/cgofuse/fuse"
@@ -56,12 +58,21 @@ index 0000000..8f8e7ab
 +// separated by "|". A trailing "/*" means "every direct child of".
 +// Only these folders are flagged so Explorer doesn't probe desktop.ini
 +// (and list the remote) in every folder of the mount.
-+var iconDirs, iconParents = parseIconDirs(os.Getenv("RCLONE_CMOUNT_ICON_DIRS"))
++//
++// RCLONE_CMOUNT_ICON_DIRS_FILE, when set, names a file with the same list.
++// It is re-read (at most once a second) when it changes, so folders can be
++// added or removed without remounting.
++var (
++	iconMu                sync.Mutex
++	iconDirs, iconParents = parseIconDirs(os.Getenv("RCLONE_CMOUNT_ICON_DIRS"))
++	iconFile              = os.Getenv("RCLONE_CMOUNT_ICON_DIRS_FILE")
++	iconMod, iconChecked  time.Time
++)
 +
-+func parseIconDirs(env string) (dirs, parents map[string]bool) {
++func parseIconDirs(list string) (dirs, parents map[string]bool) {
 +	dirs, parents = map[string]bool{}, map[string]bool{}
-+	for _, p := range strings.Split(env, "|") {
-+		p = strings.ToLower(strings.Trim(strings.ReplaceAll(p, "\\", "/"), "/"))
++	for _, p := range strings.Split(list, "|") {
++		p = strings.ToLower(strings.Trim(strings.ReplaceAll(strings.TrimSpace(p), "\\", "/"), "/"))
 +		if p == "" {
 +			continue
 +		}
@@ -74,15 +85,32 @@ index 0000000..8f8e7ab
 +	return dirs, parents
 +}
 +
++// currentIconDirs returns the folder list, reloading the file if it changed
++func currentIconDirs() (dirs, parents map[string]bool) {
++	iconMu.Lock()
++	defer iconMu.Unlock()
++	if iconFile != "" && time.Since(iconChecked) > time.Second {
++		iconChecked = time.Now()
++		if st, err := os.Stat(iconFile); err == nil && !st.ModTime().Equal(iconMod) {
++			if b, err := os.ReadFile(iconFile); err == nil {
++				iconDirs, iconParents = parseIconDirs(string(b))
++				iconMod = st.ModTime()
++			}
++		}
++	}
++	return iconDirs, iconParents
++}
++
 +// winFlags returns the BSD (Windows attribute) flags for node
 +func winFlags(node vfs.Node) uint32 {
 +	if node.IsDir() {
++		dirs, parents := currentIconDirs()
 +		p := strings.ToLower(strings.Trim(node.Path(), "/"))
 +		parent := ""
 +		if i := strings.LastIndex(p, "/"); i >= 0 {
 +			parent = p[:i]
 +		}
-+		if iconDirs[p] || (p != "" && iconParents[parent]) {
++		if dirs[p] || (p != "" && parents[parent]) {
 +			return fuse.UF_READONLY
 +		}
 +		return 0

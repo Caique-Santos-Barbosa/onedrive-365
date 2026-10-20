@@ -188,6 +188,7 @@ sealed class Rclone
         Directory.CreateDirectory(Paths.LogsDir);
         var psi = new ProcessStartInfo(Paths.Rclone) { UseShellExecute = false, CreateNoWindow = true };
         psi.Environment["RCLONE_CMOUNT_ICON_DIRS"] = ShellIntegration.IconDirs;   // patch nosso no rclone (ver tools/rclone-patch)
+        psi.Environment["RCLONE_CMOUNT_ICON_DIRS_FILE"] = Paths.IconDirsFile;     // relido quando muda: cor de pasta sem remontar
         foreach (var a in new[]
         {
             "mount", "m365:", letter,
@@ -272,6 +273,22 @@ sealed class Rclone
         }
         catch (HttpRequestException) { return null; }
         catch (TaskCanceledException) { return null; }
+    }
+
+    /// Relê do remoto só estas pastas (caminhos relativos à unidade), sem remontar.
+    public async Task<bool> RefreshDirs(params string[] dirs)
+    {
+        if (!Running || dirs.Length == 0) return false;
+        var args = new Dictionary<string, string> { ["recursive"] = "false" };
+        for (var i = 0; i < dirs.Length; i++) args[i == 0 ? "dir" : $"dir{i + 1}"] = dirs[i].Replace('\\', '/').Trim('/');
+        try
+        {
+            var r = await _rc.PostAsync($"http://127.0.0.1:{_rcPort}/vfs/refresh", new StringContent(JsonSerializer.Serialize(args), System.Text.Encoding.UTF8, "application/json"));
+            if (r.StatusCode == HttpStatusCode.OK) return true;
+            Log.Info($"vfs/refresh {string.Join(", ", dirs)}: {(int)r.StatusCode} {await r.Content.ReadAsStringAsync()}");
+            return false;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { Log.Error("vfs/refresh", e); return false; }
     }
 
     public sealed record QueueItem(string Name, long Size);

@@ -157,6 +157,19 @@ static class ShellIntegration
     {
         ColoredFolders = colors.Keys.ToList();
         ColorOf = k => colors.TryGetValue(k, out var c) ? c : null;
+        try { File.WriteAllText(Paths.IconDirsFile, IconDirs); }
+        catch (IOException e) { Log.Error("icon-dirs.txt", e); }
+    }
+
+    /// Cor de uma pasta do M: sem reescrever o overlay inteiro (amarelo = sem desktop.ini, ícone padrão).
+    public static void WriteColorIni(string folder, string color)
+    {
+        if (color == "yellow")
+        {
+            var ini = Path.Combine(Paths.OverlayDir, folder.Replace('/', '\\'), "desktop.ini");
+            if (File.Exists(ini)) File.Delete(ini);
+        }
+        else WriteDesktopIni(folder.Replace('/', '\\'), $"{ColorIcon(color)},0");
     }
 
     public static void WriteOverlay(IEnumerable<Library> libraries)

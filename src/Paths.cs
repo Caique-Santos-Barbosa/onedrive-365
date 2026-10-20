@@ -23,6 +23,8 @@ static class Paths
     public static string AppLog => Path.Combine(LogsDir, "app.log");
     public static string MountLog => Path.Combine(LogsDir, "mount.log");
     public static string SettingsFile => Path.Combine(AppDir, "settings.json");
+    /// Lista de pastas com ícone (desktop.ini) que o rclone relê sem remontar (RCLONE_CMOUNT_ICON_DIRS_FILE).
+    public static string IconDirsFile => Path.Combine(AppDir, "icon-dirs.txt");
     public static string OverlayDir => Path.Combine(AppDir, "overlay");
     public static string DriveIcon => Path.Combine(AppDir, "drive.ico");
     public static string BisyncDir => Path.Combine(AppDir, "bisync");

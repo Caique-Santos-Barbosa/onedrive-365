@@ -11,6 +11,7 @@ New-Item -ItemType Directory -Force $assets | Out-Null
 if (-not (Test-Path "$assets\rclone.exe")) {
     $src = Join-Path ([IO.Path]::GetTempPath()) "rclone-$rcloneVersion-src"
     if (-not (Test-Path $src)) { git clone -q --depth 1 --branch $rcloneVersion https://github.com/rclone/rclone $src }
+    git -C $src reset -q --hard ; git -C $src clean -fdq   # fonte reaproveitada: volta ao original antes do patch
     git -C $src apply --whitespace=nowarn (Join-Path $root 'tools\rclone-patch\onedrive365.patch')
     Push-Location $src
     $env:CGO_ENABLED = '0'
