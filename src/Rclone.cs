@@ -215,7 +215,12 @@ sealed class Rclone
 
         for (var i = 0; i < 60; i++)
         {
-            if (Directory.Exists(letter + "\\")) return;
+            if (Directory.Exists(letter + "\\"))
+            {
+                // Janelas do Explorer abertas na unidade durante a remontagem ficam com o ícone genérico em tudo
+                ShellIntegration.RefreshExplorerWindows(letter);
+                return;
+            }
             if (_mount.HasExited) throw new InvalidOperationException($"Montagem falhou. Veja {Paths.MountLog}");
             await Task.Delay(500);
         }

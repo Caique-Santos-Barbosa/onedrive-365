@@ -31,15 +31,37 @@ static class Overlays
         var dll = Resource("OneDrive365Shell.dll");
         var version = Convert.ToHexString(SHA256.HashData(dll))[..12];
         var dir = Path.Combine(Paths.AppDir, "shell", version);
-        if (!File.Exists(Path.Combine(dir, Files[0])))
-        {
-            Directory.CreateDirectory(dir);
-            foreach (var f in Files) File.WriteAllBytes(Path.Combine(dir, f), Resource(f));
-        }
+        var repaired = false;
+        Directory.CreateDirectory(dir);
+        foreach (var f in Files.Where(f => !File.Exists(Path.Combine(dir, f))))
+            File.WriteAllBytes(Path.Combine(dir, f), Resource(f));
+
+        // Versões antigas: o Explorer pode estar com a DLL velha carregada, e ela entrega ao Explorer os ícones de selo
+        // da PRÓPRIA pasta. Apagar só os .ico (a DLL travada não sai) fazia todo item do M: aparecer com o ícone de
+        // arquivo genérico até o Explorer reiniciar. Regra: a pasta só sai se a DLL sair primeiro; senão fica inteira.
         foreach (var old in Directory.GetDirectories(Path.Combine(Paths.AppDir, "shell")).Where(d => d != dir))
         {
-            try { Directory.Delete(old, recursive: true); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }   // ainda carregada no Explorer
+            var oldDll = Path.Combine(old, Files[0]);
+            try
+            {
+                if (File.Exists(oldDll)) File.Delete(oldDll);
+                Directory.Delete(old, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Em uso: garante os ícones ao lado dela (repara instalações que já perderam os .ico)
+                foreach (var icon in Files.Skip(1).Where(i => !File.Exists(Path.Combine(old, i))))
+                {
+                    try { File.WriteAllBytes(Path.Combine(old, icon), Resource(icon)); repaired = true; }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Log.Error($"Selo {icon} em {old}", e); }
+                }
+            }
+        }
+        if (repaired)
+        {
+            // O Explorer guardou a falha de quando os ícones sumiram: manda recarregar a lista de ícones
+            SHChangeNotify(0x08000000 /* SHCNE_ASSOCCHANGED */, 0x1000 /* SHCNF_IDLIST | SHCNF_FLUSH */, IntPtr.Zero, IntPtr.Zero);
+            Log.Info("Selos de status reparados para o Explorer em execução");
         }
 
         foreach (var (clsid, name) in Handlers)
@@ -119,6 +141,9 @@ static class Overlays
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     static extern void SHChangeNotify(int eventId, uint flags, string item1, IntPtr item2);
+
+    [DllImport("shell32.dll")]
+    static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
 
     static byte[] Resource(string name)
     {

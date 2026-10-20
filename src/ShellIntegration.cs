@@ -119,6 +119,9 @@ static class ShellIntegration
     }
 
     [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern void SHChangeNotify(int eventId, uint flags, string item1, IntPtr item2);
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     static extern IntPtr SHGetFileInfo(string path, uint attributes, ref SHFILEINFO info, uint size, uint flags);
 
     /// Ícone da nuvem do OneDrive no tamanho pedido (do Windows); null se o recurso não existir.
@@ -159,6 +162,43 @@ static class ShellIntegration
         ColorOf = k => colors.TryGetValue(k, out var c) ? c : null;
         try { File.WriteAllText(Paths.IconDirsFile, IconDirs); }
         catch (IOException e) { Log.Error("icon-dirs.txt", e); }
+    }
+
+    /// Atualiza (F5) as janelas do Explorer abertas na unidade. Depois de uma remontagem o Explorer mantém os itens
+    /// presos ao volume antigo e mostra o ícone genérico de arquivo em tudo até alguém apertar F5.
+    /// Duas passadas: logo que monta e de novo quando as listagens já chegaram da nuvem.
+    public static void RefreshExplorerWindows(string letter)
+    {
+        var t = new Thread(() =>
+        {
+            foreach (var delay in new[] { 600, 2500 })
+            {
+                Thread.Sleep(delay);
+                var refreshed = 0;
+                try
+                {
+                    var type = Type.GetTypeFromProgID("Shell.Application");
+                    if (type == null) return;
+                    dynamic shell = Activator.CreateInstance(type)!;
+                    foreach (var w in shell.Windows())
+                    {
+                        try
+                        {
+                            string path = w.Document.Folder.Self.Path;
+                            if (!path.StartsWith(letter, StringComparison.OrdinalIgnoreCase)) continue;
+                            w.Refresh();
+                            refreshed++;
+                        }
+                        catch (Exception) { }   // janela fechando ou que não é de pasta (ex.: Painel de Controle): ignora só ela
+                    }
+                }
+                catch (Exception e) { Log.Error("Atualizar janelas do Explorer", e); return; }
+                SHChangeNotify(0x00001000 /* SHCNE_UPDATEDIR */, 0x1005 /* SHCNF_PATHW | SHCNF_FLUSH */, letter + "\\", IntPtr.Zero);
+                if (refreshed > 0) Log.Info($"Explorer: {refreshed} janela(s) em {letter} atualizada(s)");
+            }
+        }) { IsBackground = true, Name = "RefreshExplorer" };
+        t.SetApartmentState(ApartmentState.STA);   // Shell.Application é COM de apartamento único
+        t.Start();
     }
 
     /// Cor de uma pasta do M: sem reescrever o overlay inteiro (amarelo = sem desktop.ini, ícone padrão).
