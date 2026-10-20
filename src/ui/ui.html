@@ -553,7 +553,7 @@
     $("#prefDefender").textContent = S.defenderExcluded
       ? `O Defender pula ${S.letter} na verificação completa. O que você abre continua verificado.`
       : `A verificação completa do Defender baixaria tudo de ${S.letter}. Configure para pular.`;
-    $("#prefDefenderBtn").hidden = !!S.defenderExcluded;
+    $("#prefDefenderBtn").style.display = S.defenderExcluded ? "none" : "";   // .btn tem display próprio: o atributo hidden não basta
     $("#version").textContent = "versão " + S.version;
   }
 
