@@ -109,6 +109,12 @@
   .gear svg { width: 18px; height: 18px; }
   .flow .foot .status { flex: 1; min-width: 0; text-align: left; font-size: 13px; color: var(--soft); line-height: 1.35; }
   .flow .foot .status.bad { color: var(--error); }
+  /* Voltar: seta discreta no canto, como no instalador do OneDrive */
+  .flow { position: relative; }
+  .back { position: absolute; top: 12px; left: 12px; width: 32px; height: 32px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); cursor: pointer; display: grid; place-items: center; z-index: 1; }
+  .back:hover { background: var(--band); }
+  .back:active { background: var(--btn-border); }
+  .back svg { width: 16px; height: 16px; }
   #s-done .art-sm { height: 190px; margin-top: 12px; }
 
   /* Escolher subpastas */
@@ -141,6 +147,7 @@
   <symbol id="i-gear" viewBox="0 0 20 20"><path d="M8.6 2.6h2.8l.4 2a5.6 5.6 0 0 1 1.5.9l1.9-.7 1.4 2.4-1.5 1.3a5.7 5.7 0 0 1 0 1.8l1.5 1.3-1.4 2.4-1.9-.7a5.6 5.6 0 0 1-1.5.9l-.4 2H8.6l-.4-2a5.6 5.6 0 0 1-1.5-.9l-1.9.7-1.4-2.4 1.5-1.3a5.7 5.7 0 0 1 0-1.8L3.4 7.2l1.4-2.4 1.9.7a5.6 5.6 0 0 1 1.5-.9z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
   <symbol id="i-chevr" viewBox="0 0 20 20"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-folderfill" viewBox="0 0 20 20"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4l2 2h7A1.5 1.5 0 0 1 18 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5z" fill="currentColor"/></symbol>
+  <symbol id="i-back" viewBox="0 0 16 16"><path d="M14 8H2.5M7 3 2 8l5 5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-check" viewBox="0 0 20 20"><path d="m4.5 10.5 3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
@@ -211,6 +218,7 @@
 
 <!-- 4. Pastas do PC -->
 <section class="step flow" id="s-folders">
+  <button class="back" data-back="drive" title="Voltar" aria-label="Voltar"><svg><use href="#i-back"/></svg></button>
   <div class="body">
     <img class="art-sm" id="artFolders" alt="" hidden>
     <h1>Fazer backup das pastas deste PC</h1>
@@ -222,6 +230,7 @@
 
 <!-- 5. Pronto -->
 <section class="step flow" id="s-done">
+  <button class="back" data-back="folders" title="Voltar" aria-label="Voltar"><svg><use href="#i-back"/></svg></button>
   <div class="body">
     <img class="art-sm" id="artDone" alt="" hidden style="height:170px">
     <div class="check" id="doneCheck"><svg><use href="#i-check"/></svg></div>
@@ -278,7 +287,11 @@
     go("folders"); send("folders");
   };
   function driveStatus(text, bad) { $("#driveStatus").textContent = text; $("#driveStatus").classList.toggle("bad", !!bad); }
-  $("#skipFolders").onclick = () => { send("saveFolders", { ids: [] }); go("done"); };
+  $("#skipFolders").onclick = () => go("done");   // "Agora não": não mexe no que já estava ligado
+  document.querySelectorAll("[data-back]").forEach((b) => b.onclick = () => go(b.dataset.back));
+  document.addEventListener("keydown", (e) => {   // Alt+← volta, como nos assistentes do Windows
+    if (e.altKey && e.key === "ArrowLeft") { const b = document.querySelector(".step.active [data-back]"); if (b) b.click(); }
+  });
   $("#saveFolders").onclick = () => { send("saveFolders", { ids: Object.keys(picks).filter((k) => picks[k]) }); go("done"); };
   $("#openDrive").onclick = () => send("openDrive");
   $("#close").onclick = () => send("finish");
@@ -398,7 +411,10 @@
     }
     if (m.type === "folders") {
       S.folders = m.folders;
-      m.folders.forEach((f) => { if (!(f.id in excl)) excl[f.id] = f.excluded || []; });
+      m.folders.forEach((f) => {
+        if (!(f.id in excl)) excl[f.id] = f.excluded || [];
+        if (!(f.id in picks)) picks[f.id] = !!f.enabled;   // já ligadas aparecem ligadas
+      });
       renderFolders();
     }
     if (m.type === "dirs" && pick && m.payload.id === pick.id) {

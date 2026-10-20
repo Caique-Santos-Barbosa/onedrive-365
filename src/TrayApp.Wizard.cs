@@ -84,8 +84,10 @@ sealed partial class TrayApp
                 _backup?.SetExclusions(Arg("id"), a.GetProperty("excluded").EnumerateArray().Select(x => x.GetString()!));
                 break;
             case "saveFolders":
-                foreach (var id in a.GetProperty("ids").EnumerateArray().Select(x => x.GetString()!))
-                    _backup?.SetEnabled(id, true);
+                var on = a.GetProperty("ids").EnumerateArray().Select(x => x.GetString()!).ToHashSet();
+                if (_backup != null)
+                    foreach (var k in _backup.AllFolders().Where(k => !k.Id.StartsWith("custom-")))
+                        if (_backup.State(k.Id).Enabled != on.Contains(k.Id)) _backup.SetEnabled(k.Id, on.Contains(k.Id));
                 RegisterContextMenu();
                 PushState();
                 break;
@@ -142,7 +144,7 @@ sealed partial class TrayApp
             {
                 _folderSizes.TryGetValue(k.Id, out var size);
                 if (!_folderIcons.TryGetValue(k.Id, out var icon)) _folderIcons[k.Id] = icon = IconDataUri(ShellIntegration.FolderIcon(k.LocalPath));
-                return new { id = k.Id, name = BackupManager.DisplayName(k), path = k.LocalPath, size, icon, excluded = _backup.State(k.Id).Excluded };
+                return new { id = k.Id, name = BackupManager.DisplayName(k), path = k.LocalPath, size, icon, excluded = _backup.State(k.Id).Excluded, enabled = _backup.State(k.Id).Enabled };
             }),
         });
     }
