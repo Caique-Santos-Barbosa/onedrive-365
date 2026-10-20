@@ -27,7 +27,7 @@ Check 'janela principal (todas as páginas)' {
   $n = (Get-Content $log).Count; $fail = @()
   foreach ($pg in 'home', 'activity', 'notifications', 'folders', 'sharepoint', 'preferences', 'about') {
     $png = "$out\pg-$pg.png"; Remove-Item $png -ErrorAction SilentlyContinue; Pipe "screenshot:$pg|$png"
-    for ($i = 0; $i -lt 40 -and -not (Test-Path $png); $i++) { Start-Sleep -Milliseconds 250 }
+    for ($i = 0; $i -lt 60 -and -not ((Test-Path $png) -and (Get-Item $png).Length -gt 10000); $i++) { Start-Sleep -Milliseconds 250 }   # o app cria o arquivo e depois grava a imagem
     if (-not (Test-Path $png) -or (Get-Item $png).Length -lt 10000) { $fail += $pg }
   }
   @(($fail.Count -eq 0), $(if ($fail) { "falharam: $($fail -join ',')" } else { '7 páginas renderizadas' }))
