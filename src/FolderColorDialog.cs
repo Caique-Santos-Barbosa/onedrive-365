@@ -83,6 +83,7 @@ sealed class FolderColorDialog : Form
             cancel.Location = new Point(S(280), S(272));
             ShellIntegration.CenterOnActiveScreen(this);
         };
+        Shown += (_, _) => Activate();   // aberta a pedido do Explorer: vem para a frente
         UpdateState();
     }
 

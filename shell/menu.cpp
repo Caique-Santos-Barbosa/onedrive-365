@@ -134,8 +134,12 @@ public:
 
     IFACEMETHODIMP Invoke(IShellItemArray* items, IBindCtx*) override {
         const std::wstring path = FirstPath(items);
+        if (path.empty()) return E_FAIL;
+        // Como a extensão do Google Drive: fala direto com o app que já está rodando, pela pipe dele.
+        // Abrir o exe de 98 MB a cada clique custava de 0,5 s (em cache) a vários segundos.
+        if (SendToApp(L"action:" + std::wstring(action_) + L"|" + path)) return S_OK;
         const std::wstring exe = RegString(L"Exe");
-        if (path.empty() || exe.empty()) return E_FAIL;
+        if (exe.empty()) return E_FAIL;
         std::wstring cmd = L"\"" + exe + L"\" --action " + action_ + L" \"" + path + L"\"";
         STARTUPINFOW si{sizeof(si)};
         PROCESS_INFORMATION pi{};
@@ -148,6 +152,30 @@ public:
     }
 
 private:
+    /// Entrega a mensagem na pipe \\.\pipe\HDTDrive.<usuário> (a mesma que o exe usa). false = app fechado.
+    static bool SendToApp(const std::wstring& message) {
+        wchar_t user[256];
+        DWORD len = 256;
+        if (!GetUserNameW(user, &len)) return false;
+        const std::wstring pipe = L"\\\\.\\pipe\\HDTDrive." + std::wstring(user);
+        HANDLE h = INVALID_HANDLE_VALUE;
+        for (int attempt = 0; attempt < 2 && h == INVALID_HANDLE_VALUE; attempt++) {
+            h = CreateFileW(pipe.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+            if (h == INVALID_HANDLE_VALUE && (GetLastError() != ERROR_PIPE_BUSY || !WaitNamedPipeW(pipe.c_str(), 1000))) return false;
+        }
+        if (h == INVALID_HANDLE_VALUE) return false;
+        ULONG server = 0;
+        if (GetNamedPipeServerProcessId(h, &server)) AllowSetForegroundWindow(server);   // a janela do app vem para a frente
+        const std::wstring line = message + L"\n";
+        const int bytes = WideCharToMultiByte(CP_UTF8, 0, line.c_str(), (int)line.size(), nullptr, 0, nullptr, nullptr);
+        std::string utf8(bytes, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, line.c_str(), (int)line.size(), &utf8[0], bytes, nullptr, nullptr);
+        DWORD written = 0;
+        const BOOL ok = WriteFile(h, utf8.data(), (DWORD)utf8.size(), &written, nullptr) && written == utf8.size();
+        CloseHandle(h);
+        return ok;
+    }
+
     const wchar_t* title_;
     const wchar_t* action_;
     bool foldersOnly_;

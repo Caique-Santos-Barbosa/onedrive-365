@@ -47,7 +47,9 @@ static class Program
         }
         if (!first)
         {
-            // Já tem uma instância rodando: entrega o link pra ela e sai
+            // Já tem uma instância rodando: entrega o link pra ela e sai. Fomos abertos pelo Explorer (que está
+            // na frente), então repassamos o direito de ir para a frente: a janela que ela abrir não fica atrás
+            AllowSetForegroundWindow(-1 /* ASFW_ANY */);
             SendToRunning(url ?? "show");
             return 0;
         }
@@ -117,4 +119,7 @@ static class Program
             return false;
         }
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool AllowSetForegroundWindow(int processId);
 }

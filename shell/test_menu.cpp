@@ -37,6 +37,37 @@ int wmain(int argc, wchar_t** argv) {
         }
         e->Release();
     }
+    // test_menu.exe <dll> --invoke <título do subitem> <caminho>: executa o subitem como um clique no Explorer
+    if (argc == 5 && wcscmp(argv[2], L"--invoke") == 0) {
+        IShellItem* item = nullptr;
+        IShellItemArray* arr = nullptr;
+        if (FAILED(SHCreateItemFromParsingName(argv[4], nullptr, IID_PPV_ARGS(&item)))) return 3;
+        SHCreateShellItemArrayFromShellItem(item, IID_PPV_ARGS(&arr));
+        IEnumExplorerCommand* subs = nullptr;
+        cmd->EnumSubCommands(&subs);
+        IExplorerCommand* sub = nullptr;
+        ULONG n = 0;
+        HRESULT hr = E_INVALIDARG;
+        while (subs->Next(1, &sub, &n) == S_OK) {
+            LPWSTR t = nullptr;
+            sub->GetTitle(nullptr, &t);
+            if (wcscmp(t, argv[3]) == 0) {
+                LARGE_INTEGER a, b, freq;
+                QueryPerformanceFrequency(&freq);
+                QueryPerformanceCounter(&a);
+                hr = sub->Invoke(arr, nullptr);
+                QueryPerformanceCounter(&b);
+                wprintf(L"Invoke(%s) = 0x%08lx em %.1f ms\n", t, hr, (b.QuadPart - a.QuadPart) * 1000.0 / freq.QuadPart);
+            }
+            CoTaskMemFree(t);
+            sub->Release();
+        }
+        subs->Release();
+        arr->Release();
+        item->Release();
+        cmd->Release();
+        return SUCCEEDED(hr) ? 0 : 1;
+    }
     for (int i = 2; i < argc; ++i) {
         IShellItem* item = nullptr;
         IShellItemArray* arr = nullptr;
