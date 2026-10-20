@@ -79,6 +79,15 @@ sealed partial class TrayApp : ApplicationContext
             }
 
             _settings.DriveLetter ??= PickLetter();
+            if (LetterTakenByOther(_settings.DriveLetter))
+            {
+                // A letra salva foi tomada por outra unidade (rede mapeada, pendrive): montar nela falharia sempre
+                var taken = _settings.DriveLetter;
+                _settings.DriveLetter = PickLetter();
+                _settings.Save();
+                Log.Info($"Letra {taken} em uso por outra unidade: usando {_settings.DriveLetter}");
+                AddNotice("info", $"Unidade agora em {_settings.DriveLetter}", $"A letra {taken} está sendo usada por outra unidade deste computador.");
+            }
             if (!Rclone.HasRemote("onedrive"))
             {
                 // Primeira execução: assistente (e-mail -> login no navegador -> M: -> backup -> pronto)
@@ -431,6 +440,17 @@ sealed partial class TrayApp : ApplicationContext
             Process.Start(psi);
         }
         catch (System.ComponentModel.Win32Exception ex) { Log.Error($"Não abri {path}", ex); }
+    }
+
+    /// A letra existe e não é uma montagem nossa (o rclone se apresenta como "FUSE-rclone").
+    /// Unidade de rede desconectada também ocupa a letra, mesmo sem responder.
+    static bool LetterTakenByOther(string letter)
+    {
+        var drive = DriveInfo.GetDrives().FirstOrDefault(d => char.ToUpperInvariant(d.Name[0]) == char.ToUpperInvariant(letter[0]));
+        if (drive == null) return false;
+        try { return !drive.IsReady || !drive.DriveFormat.StartsWith("FUSE", StringComparison.OrdinalIgnoreCase); }
+        catch (IOException) { return true; }
+        catch (UnauthorizedAccessException) { return true; }
     }
 
     static string PickLetter()
