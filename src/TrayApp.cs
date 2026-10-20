@@ -19,7 +19,6 @@ sealed partial class TrayApp : ApplicationContext
     string _backupStatus = "";
     BackupManager? _backup;
     bool _quitting;
-    int _restarts;
 
     string Letter => _settings.DriveLetter!;
     string SharedRoot => Path.Combine(Letter + "\\", Brand.SharePointFolder);
@@ -107,7 +106,16 @@ sealed partial class TrayApp : ApplicationContext
             ShellIntegration.SetColors(_settings.FolderColors);
             await WriteRemotesForAccount();
             SetStatus("Montando unidade…");
-            await _rclone.Start(Letter);
+            var mounted = true;
+            try { await _rclone.Start(Letter); }
+            catch (Exception ex) when (ex is not MountStuckException)
+            {
+                // Sem internet ao ligar o PC (Wi-Fi ainda conectando) é o caso comum: o app segue na bandeja e tenta de novo
+                Log.Error("Montagem falhou ao iniciar", ex);
+                mounted = false;
+                SetStatus("Sem conexão — tentando de novo…");
+                _ = KeepTryingToMount();
+            }
             _statusTimer.Start();
             await RefreshStatus();
             _backup = new BackupManager(_settings, s => _ui.BeginInvoke(() => { _backupStatus = s; PushState(); }))
@@ -140,7 +148,7 @@ sealed partial class TrayApp : ApplicationContext
             if (overlaysJustRegistered)
                 AddNotice("info", "Ícones de status chegam no próximo login", "Saia e entre no Windows para ver nuvem, no PC e sincronizando nos arquivos da unidade.");
             // Nunca reiniciamos o Explorer: os selos entram no próximo login (o Explorer só lê os handlers ao iniciar)
-            Notify("OneDrive 365 pronto", overlaysJustRegistered
+            if (mounted) Notify("OneDrive 365 pronto", overlaysJustRegistered
                 ? $"Seus arquivos estão em {Letter}\\. Os ícones de status aparecem na próxima vez que você entrar no Windows."
                 : $"Seus arquivos estão em {Letter}\\. Clique em \"Sincronizar\" no SharePoint para adicionar bibliotecas.");
         }
@@ -324,22 +332,51 @@ sealed partial class TrayApp : ApplicationContext
         }
     }
 
-    async void OnMountDied(string reason)
+    void OnMountDied(string reason)
     {
         Log.Error($"Montagem caiu: {reason}");
-        if (_quitting) return;
-        if (++_restarts > 5)
-        {
-            SetStatus("Desconectado — veja o log");
-            Notify("OneDrive 365 desconectado", "A unidade caiu várias vezes. Abra o log pelo menu do ícone.");
-            return;
-        }
+        if (_quitting || _signedOut) return;
         SetStatus("Reconectando…");
-        await Task.Delay(TimeSpan.FromSeconds(5 * _restarts));
-        await _busy.WaitAsync();
-        try { await _rclone.Start(Letter); }
-        catch (Exception ex) { Log.Error("Falha ao remontar", ex); }
-        finally { _busy.Release(); }
+        _ = KeepTryingToMount();
+    }
+
+    int _mountRetrying;   // 1 = já existe um laço de reconexão rodando
+    readonly SemaphoreSlim _networkBack = new(0);
+
+    /// Tenta montar até conseguir: 10 s, 20 s, 30 s… até 1 min entre tentativas, ou na hora em que a rede volta.
+    /// Nunca desiste (uma noite sem internet não pode deixar o app desconectado para sempre).
+    async Task KeepTryingToMount()
+    {
+        if (Interlocked.Exchange(ref _mountRetrying, 1) == 1) return;
+        System.Net.NetworkInformation.NetworkAvailabilityChangedEventHandler onNet = (_, e) => { if (e.IsAvailable) _networkBack.Release(); };
+        System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged += onNet;
+        try
+        {
+            for (var attempt = 1; !_quitting && !_signedOut; attempt++)
+            {
+                await _networkBack.WaitAsync(TimeSpan.FromSeconds(Math.Min(60, 10 * attempt)));
+                while (_networkBack.CurrentCount > 0) _networkBack.Wait(0);   // vários avisos de rede = uma tentativa
+                if (_quitting || _signedOut || _rclone.Running) break;
+                await _busy.WaitAsync();
+                try
+                {
+                    await _rclone.Start(Letter);
+                    Log.Info($"Unidade de volta depois de {attempt} tentativa(s)");
+                    _ = LoadAccountAsync(force: true);   // nome e foto também falharam enquanto estava sem internet
+                    await RefreshStatus();
+                    UpdateTrayIcon();
+                    PushState();
+                    break;
+                }
+                catch (Exception ex) { Log.Info($"Reconexão {attempt}: {ex.Message.Split('\n')[0]}"); SetStatus("Sem conexão — tentando de novo…"); }
+                finally { _busy.Release(); }
+            }
+        }
+        finally
+        {
+            System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged -= onNet;
+            Interlocked.Exchange(ref _mountRetrying, 0);
+        }
     }
 
     async Task RefreshStatus()
@@ -353,7 +390,6 @@ sealed partial class TrayApp : ApplicationContext
             catch (IOException ex) { Log.Error("Não publiquei a fila para os selos", ex); }
             TrackQueue(queue);
         }
-        _restarts = 0;
         UpdateTrayIcon();
         SetStatus(s.Uploading > 0 ? $"Enviando {s.Uploading} arquivo(s)…"
                 : s.Errored > 0 ? $"{s.Errored} arquivo(s) com erro de envio"
