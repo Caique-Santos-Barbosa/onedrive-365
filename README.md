@@ -39,6 +39,22 @@ O **Google Drive para desktop** não tem esse problema. A unidade `G:` aparece n
 
 ---
 
+<details>
+<summary>🇺🇸 <b>English summary</b></summary>
+
+**OneDrive 365** mounts your OneDrive and SharePoint libraries as a Windows drive (`M:`) that lists everything instantly and downloads a file only when you open it — the same architecture as Google Drive for desktop, built on rclone + WinFsp. No more "Processing changes" for hours on huge SharePoint libraries.
+
+- On-demand drive with OneDrive + SharePoint; folders open in ~50 ms (listings cached, kept fresh by a Microsoft Graph delta patch to rclone that also reports deletes and moves).
+- SharePoint "Sync" button adds a library in about 1 second, without processing millions of files.
+- One-way backup of PC folders (Desktop, Documents…), with per-subfolder selection, schedule and pause.
+- Windows 11 context menu (share, copy link, manage access, folder color, move to OneDrive 365), status overlays, tray flyout.
+- Word, Excel and PowerPoint open straight from the cloud with AutoSave; deleting goes to the OneDrive recycle bin.
+- C# / .NET 8 + WebView2, Explorer extensions in C++, single `.exe` installer. Works with any Microsoft 365 work account.
+
+Personal project, not affiliated with Microsoft. MIT licensed.
+
+</details>
+
 ## 🛠 O que fizemos: a arquitetura do Google Drive com o OneDrive
 
 Analisamos como o Google Drive para desktop funciona por dentro (`GoogleDriveFS.exe` + o driver de sistema de arquivos Dokan) e reproduzimos a mesma arquitetura com peças abertas, falando com o Microsoft 365.
