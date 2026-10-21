@@ -112,6 +112,7 @@ sealed partial class TrayApp
             folders,
             libraries = _settings.Libraries.OrderBy(l => l.Name).Select(l => new { name = l.Name, webUrl = l.WebUrl, root = l.Root }),
             interceptSync = _settings.InterceptSync,
+            deleteNotice = _settings.DeleteNotice,
             org = OrgName(),
             pausedUntil = _pausedUntil,
             defenderExcluded = string.Equals(_settings.DefenderExcludedLetter, _settings.DriveLetter, StringComparison.OrdinalIgnoreCase),
@@ -405,6 +406,11 @@ sealed partial class TrayApp
                     _folderSizes.Remove(Arg("id"));
                     PushState();
                     break;
+                case "setDeleteNotice":
+                    _settings.DeleteNotice = a.GetProperty("on").GetBoolean();
+                    _settings.Save();
+                    PushState();
+                    break;
                 case "setIntercept":
                     _settings.InterceptSync = a.GetProperty("on").GetBoolean();
                     _settings.Save();
@@ -504,6 +510,39 @@ sealed partial class TrayApp
         Log.Info(hours <= 0 ? "Sincronização retomada" : $"Sincronização pausada por {hours} h");
         UpdateTrayIcon();
         PushState();
+    }
+
+    void WatchDeletes(string letter)
+    {
+        _deleteWatcher?.Dispose();
+        try { _deleteWatcher = new DeleteWatcher(letter + "\\", gone => _ui.BeginInvoke(() => OnDeleted(gone))); }
+        catch (Exception ex) when (ex is IOException or ArgumentException) { Log.Error("Vigia de exclusões", ex); _deleteWatcher = null; }
+    }
+
+    /// Excluir no M: exclui na nuvem, mas vai para a lixeira (dá para restaurar): avisa e oferece abrir a lixeira certa.
+    void OnDeleted(IReadOnlyList<string> paths)
+    {
+        Log.Info($"Excluídos pelo M: {paths.Count}: {string.Join(" | ", paths.Take(5))}");
+        if (!_settings.DeleteNotice) return;
+        var spRoot = Path.Combine(_settings.DriveLetter + "\\", Brand.SharePointFolder) + "\\";
+        var lib = paths.Select(p => p.StartsWith(spRoot, StringComparison.OrdinalIgnoreCase) ? p[spRoot.Length..].Split('\\')[0] : null).Distinct().ToList();
+        var bin = lib.Count == 1 && lib[0] is { } name
+            ? SiteRecycleBinUrl(_settings.Libraries.FirstOrDefault(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.WebUrl)
+            : RecycleBinUrl();
+        var where = lib.Count == 1 && lib[0] != null ? "na Lixeira do site no SharePoint" : "na Lixeira do OneDrive";
+        var headline = paths.Count == 1 ? "Excluído da nuvem" : $"{paths.Count} itens excluídos da nuvem";
+        var detail = paths.Count == 1 ? $"\"{Path.GetFileName(paths[0])}\" está {where} e pode ser restaurado." : $"Eles estão {where} e podem ser restaurados.";
+        new LinkToast(Brand.Name, "🗑", headline, detail, "Abrir lixeira", () => { if (bin != null) MainWindow.OpenExternal(bin); }, activate: false,
+            dontShowAgain: never => { if (!never) return; _settings.DeleteNotice = false; _settings.Save(); PushState(); }).Show();
+    }
+
+    /// Lixeira de um site do SharePoint a partir do endereço da biblioteca (…/sites/X/Documentos → …/sites/X/_layouts/15/RecycleBin.aspx)
+    static string? SiteRecycleBinUrl(string? libraryUrl)
+    {
+        if (!Uri.TryCreate(libraryUrl, UriKind.Absolute, out var u)) return null;
+        var segs = u.AbsolutePath.Trim('/').Split('/');
+        var site = segs.Length >= 2 && segs[0] is "sites" or "teams" or "personal" ? $"/{segs[0]}/{segs[1]}" : "";
+        return $"{u.Scheme}://{u.Host}{site}/_layouts/15/RecycleBin.aspx";
     }
 
     /// Lixeira do OneDrive na web: https://<tenant>-my.sharepoint.com/personal/<usuário>/_layouts/15/RecycleBin.aspx

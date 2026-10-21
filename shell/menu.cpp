@@ -119,15 +119,19 @@ private:
 
 class SubCommand final : public CommandBase {
 public:
-    SubCommand(const wchar_t* title, const wchar_t* action, bool foldersOnly = false)
-        : title_(title), action_(action), foldersOnly_(foldersOnly) {}
+    enum Filter { All, FoldersOnly, OfficeOnly };
+    SubCommand(const wchar_t* title, const wchar_t* action, Filter filter = All)
+        : title_(title), action_(action), filter_(filter) {}
 
     IFACEMETHODIMP GetTitle(IShellItemArray*, LPWSTR* name) override { return SHStrDupW(title_, name); }
     IFACEMETHODIMP GetIcon(IShellItemArray*, LPWSTR* icon) override {
         return SHStrDupW((ModuleDir() + L"menuicons\\" + action_ + L".ico").c_str(), icon);
     }
     IFACEMETHODIMP GetState(IShellItemArray* items, BOOL, EXPCMDSTATE* state) override {
-        *state = foldersOnly_ && !IsFolder(items) ? ECS_HIDDEN : ECS_ENABLED;
+        const bool show = filter_ == FoldersOnly ? IsFolder(items)
+                        : filter_ == OfficeOnly ? !IsFolder(items) && IsOfficeFile(FirstPath(items))
+                        : true;
+        *state = show ? ECS_ENABLED : ECS_HIDDEN;
         return S_OK;
     }
     IFACEMETHODIMP GetFlags(EXPCMDFLAGS* flags) override { *flags = ECF_DEFAULT; return S_OK; }
@@ -176,9 +180,19 @@ private:
         return ok;
     }
 
+    static bool IsOfficeFile(const std::wstring& path) {
+        static const wchar_t* exts[] = {L".docx", L".docm", L".doc", L".dotx", L".rtf", L".odt", L".xlsx", L".xlsm", L".xlsb",
+                                        L".xls", L".ods", L".pptx", L".pptm", L".ppt", L".ppsx", L".odp"};
+        const size_t dot = path.rfind(L'.');
+        if (dot == std::wstring::npos || path.find(L'\\', dot) != std::wstring::npos) return false;
+        for (const auto* e : exts)
+            if (_wcsicmp(path.c_str() + dot, e) == 0) return true;
+        return false;
+    }
+
     const wchar_t* title_;
     const wchar_t* action_;
-    bool foldersOnly_;
+    Filter filter_;
 };
 
 class SubEnum final : public IEnumExplorerCommand {
@@ -189,7 +203,8 @@ public:
         items_.push_back(new (std::nothrow) SubCommand(L"Copiar Link", L"link"));
         items_.push_back(new (std::nothrow) SubCommand(L"Gerenciar acesso", L"access"));
         items_.push_back(new (std::nothrow) SubCommand(L"Exibir online", L"web"));
-        items_.push_back(new (std::nothrow) SubCommand(L"Cor da pasta", L"color", true));
+        items_.push_back(new (std::nothrow) SubCommand(L"Abrir com salvamento automático", L"office", SubCommand::OfficeOnly));
+        items_.push_back(new (std::nothrow) SubCommand(L"Cor da pasta", L"color", SubCommand::FoldersOnly));
     }
     ~SubEnum() {
         for (auto* c : items_) if (c) c->Release();

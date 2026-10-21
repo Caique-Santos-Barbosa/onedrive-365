@@ -384,6 +384,8 @@
     <div class="card"><div class="rows">
       <div class="row"><svg><use href="#i-sites"/></svg><div><div class="name">Botão "Sincronizar" do SharePoint abre o OneDrive 365</div><div class="sub">Desligado, o botão volta a abrir o OneDrive da Microsoft.</div></div>
         <label class="switch"><input type="checkbox" id="prefIntercept"><span></span></label></div>
+      <div class="row"><svg><use href="#i-info"/></svg><div><div class="name">Avisar quando excluir da nuvem</div><div class="sub">Excluir no M: exclui no OneDrive/SharePoint; o item vai para a lixeira e pode ser restaurado.</div></div>
+        <label class="switch"><input type="checkbox" id="prefDeleteNotice"><span></span></label></div>
       <div class="row"><svg><use href="#i-sync"/></svg><div><div class="name">Horário de sincronização</div>
           <div class="sub">Envia as pastas do PC só neste intervalo, para não pesar na internet durante o expediente.</div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:8px">das <input type="time" id="schedFrom" class="timeinp"> às <input type="time" id="schedTo" class="timeinp"></div></div>
@@ -551,6 +553,7 @@
     renderLibraries();
 
     $("#prefIntercept").checked = S.interceptSync;
+    $("#prefDeleteNotice").checked = S.deleteNotice;
     if (document.activeElement?.className !== "timeinp") { $("#schedFrom").value = S.schedule.from; $("#schedTo").value = S.schedule.to; }
     $("#schedOn").checked = S.schedule.on;
     $("#prefDrive").textContent = `${S.letter} (OneDrive 365). Abre sozinha quando você entra no Windows.`;
@@ -683,6 +686,7 @@
     const t = e.target;
     if (t.dataset.folder) { send("toggleFolder", { id: t.dataset.folder, on: t.checked }); return; }
     if (t.id === "prefIntercept") send("setIntercept", { on: t.checked });
+    if (t.id === "prefDeleteNotice") send("setDeleteNotice", { on: t.checked });
     if (["schedOn", "schedFrom", "schedTo"].includes(t.id))
       send("setSchedule", { on: $("#schedOn").checked, from: $("#schedFrom").value, to: $("#schedTo").value });
   });

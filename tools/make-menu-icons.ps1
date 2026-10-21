@@ -53,6 +53,14 @@ Write-Ico (Join-Path $menuDir 'web.ico') $menuSizes { param($g, $k)
     $g.DrawEllipse($p, 2.5 * $k, 2.5 * $k, 15 * $k, 15 * $k); $g.DrawEllipse($p, 6.5 * $k, 2.5 * $k, 7 * $k, 15 * $k)
     $g.DrawLine($p, (P 2.5 10 $k), (P 17.5 10 $k))
 }
+# Abrir com salvamento automático: documento com setas circulares (salva sozinho na nuvem)
+Write-Ico (Join-Path $menuDir 'office.ico') $menuSizes { param($g, $k)
+    $p = Pen $k
+    $g.DrawLines($p, [Drawing.PointF[]]@((P 9 17 $k), (P 4.5 17 $k), (P 3.5 16 $k), (P 3.5 3.5 $k), (P 4.5 2.5 $k), (P 10.5 2.5 $k), (P 14.5 6.5 $k), (P 14.5 8 $k)))
+    $g.DrawLines($p, [Drawing.PointF[]]@((P 10.5 2.5 $k), (P 10.5 6.5 $k), (P 14.5 6.5 $k)))
+    $g.DrawArc($p, 10.5 * $k, 10 * $k, 7 * $k, 7 * $k, 200, 250)
+    $g.DrawLines($p, [Drawing.PointF[]]@((P 10.3 10.6 $k), (P 10.6 12.6 $k), (P 12.6 12.3 $k)))
+}
 # Cor da pasta: paleta
 Write-Ico (Join-Path $menuDir 'color.ico') $menuSizes { param($g, $k)
     $p = Pen $k

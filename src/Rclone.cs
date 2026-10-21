@@ -27,6 +27,7 @@ sealed class Rclone
     readonly HttpClient _rcSlow = new() { Timeout = TimeSpan.FromSeconds(60) };
 
     public event Action<string>? MountDied;
+    public event Action<string>? Mounted;   // letra, assim que a unidade aparece (inclusive em remontagens)
     public bool Running => _mount is { HasExited: false };
 
     public static Task<(int code, string output)> Run(TimeSpan timeout, params string[] args) =>
@@ -225,6 +226,7 @@ sealed class Rclone
                 // Janelas do Explorer abertas na unidade durante a remontagem ficam com o ícone genérico em tudo
                 ShellIntegration.RefreshExplorerWindows(letter);
                 _ = Task.Run(() => WarmUp(letter + "\\"));
+                Mounted?.Invoke(letter);
                 return;
             }
             if (_mount.HasExited) throw new InvalidOperationException($"Montagem falhou. Veja {Paths.MountLog}");

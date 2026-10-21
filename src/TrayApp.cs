@@ -19,6 +19,7 @@ sealed partial class TrayApp : ApplicationContext
     string _backupStatus = "";
     BackupManager? _backup;
     CacheWatcher? _cacheWatcher;
+    DeleteWatcher? _deleteWatcher;
     bool _quitting;
 
     string Letter => _settings.DriveLetter!;
@@ -47,6 +48,7 @@ sealed partial class TrayApp : ApplicationContext
         // Clique esquerdo ou direito abre o painel da bandeja, como o OneDrive
         _tray.MouseUp += (_, e) => { if (e.Button is MouseButtons.Left or MouseButtons.Right) ToggleFlyout(); };
         _rclone.MountDied += reason => _ui.BeginInvoke(() => OnMountDied(reason));
+        _rclone.Mounted += letter => _ui.BeginInvoke(() => WatchDeletes(letter));
         LoadActivity();
         _statusTimer.Tick += async (_, _) => await RefreshStatus();
 
@@ -446,6 +448,7 @@ sealed partial class TrayApp : ApplicationContext
         _statusTimer.Stop();
         _backup?.Dispose();
         _cacheWatcher?.Dispose();
+        _deleteWatcher?.Dispose();
         try { await _rclone.Stop(TimeSpan.FromSeconds(confirm ? 0 : 20)); }
         catch (MountStuckException) { Log.Error("Saindo com a montagem presa; o reinício do Windows libera"); }
         _tray.Visible = false;

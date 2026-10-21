@@ -76,6 +76,21 @@ int wmain(int argc, wchar_t** argv) {
         EXPCMDSTATE st = ECS_HIDDEN;
         cmd->GetState(arr, FALSE, &st);
         wprintf(L"%-9s %s\n", st == ECS_HIDDEN ? L"oculto" : L"visível", argv[i]);
+        IEnumExplorerCommand* subs = nullptr;
+        if (st != ECS_HIDDEN && SUCCEEDED(cmd->EnumSubCommands(&subs))) {
+            IExplorerCommand* sub = nullptr;
+            ULONG n = 0;
+            while (subs->Next(1, &sub, &n) == S_OK) {
+                LPWSTR t = nullptr;
+                EXPCMDSTATE ss = ECS_HIDDEN;
+                sub->GetTitle(arr, &t);
+                sub->GetState(arr, FALSE, &ss);
+                if (ss != ECS_HIDDEN) wprintf(L"    - %s\n", t);
+                CoTaskMemFree(t);
+                sub->Release();
+            }
+            subs->Release();
+        }
         arr->Release();
         item->Release();
     }

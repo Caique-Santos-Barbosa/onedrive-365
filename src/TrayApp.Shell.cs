@@ -45,11 +45,14 @@ sealed partial class TrayApp
                 ("2link", "Copiar Link", "link"),
                 ("3access", "Gerenciar acesso", "access"),
                 ("4web", "Exibir online", "web"),
-                ("5color", "Cor da pasta", "color"),
+                ("5office", "Abrir com salvamento automático", "office"),
+                ("6color", "Cor da pasta", "color"),
             })
             {
                 if (action == "color" && !target.EndsWith(@"Directory\shell")) continue;   // só em pastas
+                if (action == "office" && !target.EndsWith(@"*\shell")) continue;         // só em arquivos do Office
                 using var v = k.CreateSubKey($@"shell\{id}");
+                if (action == "office") v.SetValue("AppliesTo", string.Join(" OR ", OfficeApps.Keys.Select(e => $"System.FileExtension:={e}")));
                 v.SetValue("MUIVerb", label);
                 v.SetValue("Icon", Path.Combine(Paths.AppDir, "menuicons", action + ".ico"));
                 using var c = v.CreateSubKey("command");
@@ -130,6 +133,9 @@ sealed partial class TrayApp
             case "web":
                 MainWindow.OpenExternal(item.WebUrl);
                 break;
+            case "office":
+                OpenInOffice(item, path);
+                break;
             case "link":
                 var (url, scope) = await DefaultLink(item);
                 Clipboard.SetText(url);
@@ -143,6 +149,31 @@ sealed partial class TrayApp
             case "access":
                 new ShareDialog(item, _settings, OrgName(), "access").Show();
                 break;
+        }
+    }
+
+    /// Extensão -> esquema do Office (https://learn.microsoft.com/office/client-developer/office-uri-schemes)
+    static readonly Dictionary<string, string> OfficeApps = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".docx"] = "ms-word", [".docm"] = "ms-word", [".doc"] = "ms-word", [".dotx"] = "ms-word", [".rtf"] = "ms-word", [".odt"] = "ms-word",
+        [".xlsx"] = "ms-excel", [".xlsm"] = "ms-excel", [".xlsb"] = "ms-excel", [".xls"] = "ms-excel", [".ods"] = "ms-excel",
+        [".pptx"] = "ms-powerpoint", [".pptm"] = "ms-powerpoint", [".ppt"] = "ms-powerpoint", [".ppsx"] = "ms-powerpoint", [".odp"] = "ms-powerpoint",
+    };
+
+    /// Abre pelo endereço da nuvem, como o Office faz com a pasta do OneDrive: salvamento automático, coautoria e histórico de versões.
+    /// O arquivo continua no mesmo lugar do M:; o que muda é que o Office salva direto no SharePoint.
+    static void OpenInOffice(Graph.DriveItem item, string path)
+    {
+        if (!OfficeApps.TryGetValue(Path.GetExtension(path), out var scheme) || string.IsNullOrEmpty(item.WebDavUrl))
+        {
+            MainWindow.OpenExternal(item.WebUrl);   // sem app do Office para o tipo (ou conta pessoal sem webDavUrl): abre no navegador
+            return;
+        }
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"{scheme}:ofe|u|{item.WebDavUrl}") { UseShellExecute = true }); }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            Log.Error("Office não instalado: abrindo no navegador", ex);
+            MainWindow.OpenExternal(item.WebUrl);
         }
     }
 

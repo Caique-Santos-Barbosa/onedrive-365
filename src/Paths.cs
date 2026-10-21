@@ -63,6 +63,8 @@ public sealed class Library
 public sealed class Settings
 {
     public bool InterceptSync { get; set; } = true;
+    /// Aviso "Excluído da nuvem" depois de excluir no M: (a pessoa desliga com "Não mostrar novamente").
+    public bool DeleteNotice { get; set; } = true;
     public string? OriginalOdopenCommand { get; set; }
     public string? DriveLetter { get; set; }
     public List<Library> Libraries { get; set; } = new();

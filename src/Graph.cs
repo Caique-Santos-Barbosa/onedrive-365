@@ -238,16 +238,17 @@ static class Graph
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { return null; }
     }
 
-    public sealed record DriveItem(string DriveId, string Id, string Name, string WebUrl, bool IsFolder);
+    public sealed record DriveItem(string DriveId, string Id, string Name, string WebUrl, bool IsFolder, string? WebDavUrl = null);
 
     /// Item da nuvem por caminho Graph (ex.: "me/drive/root:/Documentos/a.docx"); null se não existe.
     public static async Task<DriveItem?> Item(string graphPath)
     {
         try
         {
-            var i = await Get($"{graphPath}?$select=id,name,webUrl,folder,parentReference");
+            var i = await Get($"{graphPath}?$select=id,name,webUrl,webDavUrl,folder,parentReference");
             return new DriveItem(i.GetProperty("parentReference").GetProperty("driveId").GetString()!, i.GetProperty("id").GetString()!,
-                i.GetProperty("name").GetString() ?? "", i.GetProperty("webUrl").GetString() ?? "", i.TryGetProperty("folder", out _));
+                i.GetProperty("name").GetString() ?? "", i.GetProperty("webUrl").GetString() ?? "", i.TryGetProperty("folder", out _),
+                i.TryGetProperty("webDavUrl", out var dav) ? dav.GetString() : null);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { return null; }
     }
