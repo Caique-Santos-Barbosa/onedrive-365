@@ -306,7 +306,7 @@
         ${p.kind !== "owner" && !p.inherited ? `<button class="rm" data-del="${esc(p.id)}" title="Remover acesso"><svg style="width:16px;height:16px"><use href="#i-x"/></svg></button>` : ""}
       </div>`).join("");
     if (tab === "person" && !shared)
-      html += `<div class="empty">Esta ${I.isFolder ? "pasta" : "arquivo"} ainda não foi compartilhad${I.isFolder ? "a" : "o"} com ninguém.</div>
+      html += `<div class="empty">${I.isFolder ? "Esta pasta" : "Este arquivo"} ainda não foi compartilhad${I.isFolder ? "a" : "o"} com ninguém.</div>
                <button class="link-btn" data-goto="main"><svg><use href="#i-add"/></svg>Iniciar compartilhamento</button>`;
     else if (!list.length) html += `<div class="empty">${tab === "group" ? "Nenhum grupo tem acesso." : "Nenhum link criado."}</div>`;
     $("#accessList").innerHTML = html;

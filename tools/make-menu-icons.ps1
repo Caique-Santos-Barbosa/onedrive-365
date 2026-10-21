@@ -61,6 +61,15 @@ Write-Ico (Join-Path $menuDir 'office.ico') $menuSizes { param($g, $k)
     $g.DrawArc($p, 10.5 * $k, 10 * $k, 7 * $k, 7 * $k, 200, 250)
     $g.DrawLines($p, [Drawing.PointF[]]@((P 10.3 10.6 $k), (P 10.6 12.6 $k), (P 12.6 12.3 $k)))
 }
+# Mover para o OneDrive 365: nuvem com seta subindo
+Write-Ico (Join-Path $menuDir 'move.ico') $menuSizes { param($g, $k)
+    $p = Pen $k
+    $g.DrawArc($p, 2.5 * $k, 8 * $k, 6 * $k, 6 * $k, 90, 180)
+    $g.DrawArc($p, 5 * $k, 3.5 * $k, 9 * $k, 9 * $k, 180, 150)
+    $g.DrawArc($p, 11 * $k, 7.5 * $k, 6.5 * $k, 6.5 * $k, 250, 200)
+    $g.DrawLine($p, (P 5.5 14 $k), (P 7.5 14 $k)); $g.DrawLine($p, (P 12.5 14 $k), (P 14.3 14 $k))
+    $g.DrawLine($p, (P 10 17.5 $k), (P 10 9.5 $k)); $g.DrawLines($p, [Drawing.PointF[]]@((P 7.5 12 $k), (P 10 9.5 $k), (P 12.5 12 $k)))
+}
 # Cor da pasta: paleta
 Write-Ico (Join-Path $menuDir 'color.ico') $menuSizes { param($g, $k)
     $p = Pen $k

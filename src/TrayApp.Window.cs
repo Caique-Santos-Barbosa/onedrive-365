@@ -252,6 +252,7 @@ sealed partial class TrayApp
 
     void OnBackupFile(BackupManager.Known k, string rel, long size)
     {
+        if (IsInternal(Path.GetFileName(rel))) return;   // desktop.ini do Windows sobe (cópia fiel), mas não é atividade
         AddActivity(new ActivityItem(DateTime.Now, Path.GetFileName(rel), BackupWhere(k, rel), Path.Combine(k.LocalPath, rel.Replace('/', '\\')), size, "done"));
         // A tela é atualizada pelo próximo andamento (a cada 2 s), não a cada arquivo
     }

@@ -52,15 +52,22 @@ Analisamos como o Google Drive para desktop funciona por dentro (`GoogleDriveFS.
 
 **Por baixo do capô:**
 
-1. **Unidade sob demanda.** O `rclone mount` com `--vfs-cache-mode full` sobre o WinFsp. A nuvem só é consultada quando você abre uma pasta, e o arquivo só desce quando você o abre. O cache local vai até 20 GB, e o que não é usado há 7 dias sai sozinho.
+1. **Unidade sob demanda.** O `rclone mount` com `--vfs-cache-mode full` sobre o WinFsp. O arquivo só desce quando você o abre. O cache local vai até 20 GB, e o que não é usado há 7 dias sai sozinho.
+   - **Pastas abrem na hora** (~50 ms em vez de 3 a 4 s): as listagens ficam em memória e, ao montar, o app lê em segundo plano os três primeiros níveis de pastas, como o Google Drive faz com o banco local de metadados. Só o que mudou na nuvem é relido.
+   - **Selo "no PC" na hora:** quando um arquivo termina de baixar, o Explorer troca a nuvem pelo ✓ verde e o painel mostra "Baixado em …".
 2. **Uma unidade, dois mundos.** Remotes `combine` + `union` juntam o **Meu OneDrive** e as **bibliotecas do SharePoint** em `M:`, com um único login.
 3. **Botão "Sincronizar" do SharePoint.** O app se registra como dono do protocolo `odopen://`, resolve a biblioteca pelo Microsoft Graph e a coloca em `M:\SharePoint` em ~1 segundo, sem processar nada. Outros links `odopen://` continuam indo para o OneDrive original. Também dá para escolher, numa lista só, quais bibliotecas que a conta acessa entram na unidade.
 4. **Qualquer conta, qualquer tenant.** Ao trocar de conta ("Desvincular este PC"), bibliotecas que a conta nova não acessa saem sozinhas e o histórico da conta anterior é apagado.
-5. **Patch no rclone** (`tools/rclone-patch`). Atributos de pasta para o Windows mostrar ícones próprios, e notificação de mudanças funcionando também na união de remotes.
-6. **Backup das pastas do PC, só de envio.** Área de Trabalho, Documentos, Imagens, Downloads, Músicas, Vídeos e pastas extras são copiadas para o Meu OneDrive, com 16 envios em paralelo e envio imediato de cada arquivo alterado. **Nada é baixado para o PC.** Uma ⚙ por pasta permite escolher as subpastas.
+5. **Patch no rclone** (`tools/rclone-patch`):
+   - atributos de pasta para o Windows mostrar ícones e cores próprios;
+   - notificação de mudanças funcionando também na união de remotes;
+   - **exclusões e itens movidos na nuvem são avisados** (o delta do OneDrive for Business manda itens excluídos sem caminho, e o rclone original os ignorava). Por isso a unidade pode guardar as listagens sem ficar desatualizada.
+6. **Backup das pastas do PC, só de envio.** Área de Trabalho, Documentos, Imagens, Downloads, Músicas, Vídeos e pastas extras são copiadas para o Meu OneDrive, com 16 envios em paralelo e envio imediato de cada arquivo alterado. **Nada é baixado para o PC.** Uma ⚙ por pasta permite escolher as subpastas, com **Selecionar tudo / Desmarcar tudo** e a opção **"Arquivos soltos nesta pasta"**.
 7. **Integração com o Windows igual à do OneDrive:**
    - selos de status nos arquivos (extensão de shell em C++);
-   - menu do botão direito no Windows 11 e em "Mostrar mais opções" (pacote MSIX esparso), com Compartilhar, Copiar link, Gerenciar acesso, Exibir online e Cor da pasta;
+   - menu do botão direito no Windows 11 e em "Mostrar mais opções" (pacote MSIX esparso), com Compartilhar, Copiar link, Gerenciar acesso, Exibir online, **Abrir com salvamento automático** e Cor da pasta. Fora da nuvem, **Mover para o OneDrive 365**, como o "Mover para o OneDrive" original;
+   - **Word, Excel e PowerPoint com salvamento automático:** "Abrir com salvamento automático" abre o arquivo do M: pelo endereço do SharePoint, com coautoria e histórico de versões;
+   - **excluir no M: vai para a lixeira do OneDrive** (ou do site do SharePoint) e pode ser restaurado. Um aviso discreto oferece "Abrir lixeira", com "Não mostrar novamente";
    - ícone na bandeja com animação de sincronização e painel igual ao do OneDrive, com Pausar, Desvincular este PC e Sair;
    - assistente de instalação com as ilustrações do próprio OneDrive.
 8. **Instalador único.** Um só `.exe` (~98 MB) traz o .NET, o rclone, o WinFsp, as extensões de shell e a interface. Ele pede o administrador uma única vez.
@@ -73,6 +80,15 @@ Analisamos como o Google Drive para desktop funciona por dentro (`GoogleDriveFS.
 | OneDrive 365 (M:) | Este Computador |
 |---|---|
 | ![](docs/screenshots/a5-explorer-unidade-m.png) | ![](docs/screenshots/a6-explorer-este-computador.png) |
+| **Selos: nuvem e ✓ no PC** | **Menu do botão direito** |
+| ![](docs/screenshots/a8-explorer-selos.png) | ![](docs/screenshots/20-menu-explorer.png) |
+
+### Office, exclusão e escolha de pastas
+| Word pela nuvem, com salvamento automático | Excluído da nuvem → lixeira |
+|---|---|
+| ![](docs/screenshots/21-office-salvamento-automatico.png) | ![](docs/screenshots/19-aviso-exclusao.png) |
+| **Escolher pastas** (Selecionar tudo, arquivos soltos) | |
+| ![](docs/screenshots/18-escolher-pastas.png) | |
 
 ### Janela principal
 | Início | Início, fazendo backup |
