@@ -1,4 +1,4 @@
-# Uso: pwsh tools\tests\regressao.ps1  (com o app instalado e logado; precisa da pasta M:\Meu OneDrive\_icone_teste\cor para o teste de cor)
+﻿# Uso: pwsh tools\tests\regressao.ps1  (com o app instalado e logado; precisa da pasta M:\Meu OneDrive\_icone_teste\cor para o teste de cor)
 # Bateria de regressão passiva do OneDrive 365 (não mexe em mouse/teclado; desfaz o que muda).
 $ErrorActionPreference = 'Continue'
 $app = "$env:LOCALAPPDATA\OneDrive 365"; $log = "$app\logs\app.log"
@@ -32,7 +32,7 @@ Check 'janela principal (todas as páginas)' {
   }
   @(($fail.Count -eq 0), $(if ($fail) { "falharam: $($fail -join ',')" } else { '7 páginas renderizadas' }))
 }
-Check 'painel da bandeja' { $png = "$out\flyout.png"; Remove-Item $png -ErrorAction SilentlyContinue; Pipe "flyout-shot:$png"; for ($i = 0; $i -lt 40 -and -not (Test-Path $png); $i++) { Start-Sleep -Milliseconds 250 }; @(((Test-Path $png) -and (Get-Item $png).Length -gt 5000), 'renderizado') }
+Check 'painel da bandeja' { $png = "$out\flyout.png"; Remove-Item $png -ErrorAction SilentlyContinue; Pipe "flyout-shot:$png"; for ($i = 0; $i -lt 40 -and -not ((Test-Path $png) -and (Get-Item $png).Length -gt 5000); $i++) { Start-Sleep -Milliseconds 250 }; @(((Test-Path $png) -and (Get-Item $png).Length -gt 5000), 'renderizado') }
 Check 'menu do Explorer (DLL) entrega na pipe' {
   $n = (Get-Content $log).Count
   $exe = (Join-Path $PSScriptRoot '..\..\shell\out\test_menu.exe'); $dll = (Join-Path $PSScriptRoot '..\..\shell\out\OneDrive365Menu.dll')

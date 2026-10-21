@@ -164,4 +164,4 @@ docs/           prints
 - [rclone](https://github.com/rclone/rclone): MIT.
 - [WinFsp](https://github.com/winfsp/winfsp): GPLv3 com exceção FLOSS. O instalador oficial é redistribuído sem modificação.
 
-<div align="center"><sub>Feito por Caique Santos Barbosa. Não é um produto da Microsoft. OneDrive, SharePoint e Microsoft 365 são marcas da Microsoft.</sub></div>
+<div align="center"><sub>Feito por Caique Santos Barbosa · <a href="https://www.linkedin.com/in/caique-santos-barbosa/">LinkedIn</a> · <a href="https://github.com/Caique-Santos-Barbosa">GitHub</a>. Não é um produto da Microsoft. OneDrive, SharePoint e Microsoft 365 são marcas da Microsoft.</sub></div>

@@ -203,8 +203,8 @@ sealed class Rclone
             "--vfs-cache-min-free-space", "2G",  // o cache nunca deixa o disco com menos de 2 GB livres
             "--vfs-cache-max-age", "168h",
             "--cache-dir", Paths.CacheDir,
-            "--dir-cache-time", "5m",            // listagens em memória; 5m cobre exclusões que o delta do Business não informa
-            "--poll-interval", "1m",             // arquivos novos/alterados na nuvem chegam via delta a cada minuto
+            "--dir-cache-time", "1000h",         // listagens ficam em memória: abrir pasta não espera o Graph (~1 a 4 s)
+            "--poll-interval", "1m",             // o delta (com o nosso patch, inclusive exclusões e movidos) invalida só o que mudou
             "--rc", "--rc-addr", $"127.0.0.1:{_rcPort}", "--rc-user", user, "--rc-pass", pass,
             "--log-level", "NOTICE", "--log-file", Paths.MountLog,
         }) psi.ArgumentList.Add(a);
@@ -224,12 +224,39 @@ sealed class Rclone
             {
                 // Janelas do Explorer abertas na unidade durante a remontagem ficam com o ícone genérico em tudo
                 ShellIntegration.RefreshExplorerWindows(letter);
+                _ = Task.Run(() => WarmUp(letter + "\\"));
                 return;
             }
             if (_mount.HasExited) throw new InvalidOperationException($"Montagem falhou. Veja {Paths.MountLog}");
             await Task.Delay(500);
         }
         throw new TimeoutException($"A unidade {letter} não apareceu em 30s. Veja {Paths.MountLog}");
+    }
+
+    /// Lê em segundo plano as pastas dos primeiros níveis, como o Google Drive faz com o banco local de metadados:
+    /// o primeiro clique em "Meu OneDrive", numa biblioteca ou numa pasta logo abaixo já abre do cache.
+    static void WarmUp(string root, int maxDepth = 3, int maxDirs = 400)
+    {
+        var sw = Stopwatch.StartNew();
+        var level = new List<string> { root };
+        var count = 0;
+        try
+        {
+            for (var depth = 0; depth <= maxDepth && level.Count > 0 && count < maxDirs; depth++)
+            {
+                var batch = level.Take(maxDirs - count).ToList();
+                count += batch.Count;
+                var next = new System.Collections.Concurrent.ConcurrentBag<string>();
+                Parallel.ForEach(batch, new ParallelOptions { MaxDegreeOfParallelism = 4 }, dir =>
+                {
+                    try { foreach (var d in Directory.EnumerateDirectories(dir)) next.Add(d); }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }   // pasta sumiu ou unidade caiu: segue com as outras
+                });
+                level = next.OrderBy(d => d, StringComparer.OrdinalIgnoreCase).ToList();
+            }
+            Log.Info($"pré-carga: {count} pastas em {sw.ElapsedMilliseconds} ms");
+        }
+        catch (Exception e) { Log.Error("pré-carga", e); }
     }
 
     /// Para a montagem. Uploads pendentes ficam no cache e o rclone retoma na próxima montagem.

@@ -1,3 +1,123 @@
+diff --git a/backend/onedrive/onedrive.go b/backend/onedrive/onedrive.go
+index daef4d8..4d55357 100644
+--- a/backend/onedrive/onedrive.go
++++ b/backend/onedrive/onedrive.go
+@@ -838,6 +838,7 @@ type Fs struct {
+ 	driveID      string             // ID to use for querying Microsoft Graph
+ 	driveType    string             // https://developer.microsoft.com/en-us/graph/docs/api-reference/v1.0/resources/drive
+ 	hashType     hash.Type          // type of the hash we are using
++	seen         *sync.Map          // OneDrive 365: ID -> caminho visto na última listagem (para avisar a pasta antiga em mover/excluir)
+ }
+ 
+ // Object describes a OneDrive object
+@@ -1125,6 +1126,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
+ 
+ 	ci := fs.GetConfig(ctx)
+ 	f := &Fs{
++		seen:      new(sync.Map),
+ 		name:      name,
+ 		root:      root,
+ 		opt:       *opt,
+@@ -1389,6 +1391,7 @@ func (f *Fs) itemToDirEntry(ctx context.Context, dir string, info *api.Item) (en
+ 		return nil, nil
+ 	}
+ 	remote := path.Join(dir, info.GetName())
++	f.seen.Store(info.GetID(), remote)
+ 	folder := info.GetFolder()
+ 	if folder != nil {
+ 		// cache the directory ID for later lookups
+@@ -3122,12 +3125,36 @@ func (f *Fs) changeNotifyRunner(ctx context.Context, notifyFunc func(string, fs.
+ 	}
+ 	nextDeltaToken = parsedURL.Query().Get("token")
+ 
++	parents := map[string]string{}
+ 	for _, item := range delta.Value {
+ 		isDriveRootFolder := item.GetParentReference().ID == ""
+ 		if isDriveRootFolder {
+ 			continue
+ 		}
+ 
++		// OneDrive 365: o delta do Business manda itens excluídos sem caminho e sem faceta file/folder.
++		// Resolve a pasta-mãe pelo ID e avisa como objeto, o que invalida só a listagem da mãe.
++		if old, ok := f.seen.Load(item.GetID()); ok && item.Deleted != nil {
++			f.seen.Delete(item.GetID())
++			notifyFunc(old.(string), fs.EntryObject) // invalida a pasta onde ele estava
++			continue
++		}
++		if item.Deleted != nil || item.GetParentReference().Path == "" {
++			parentPath, ok := f.changeNotifyParentPath(ctx, item.GetParentReference().ID, parents)
++			if !ok {
++				continue
++			}
++			leaf := item.GetName()
++			if leaf == "" {
++				leaf = item.GetID()
++			}
++			fullPath := strings.TrimPrefix(parentPath+"/"+leaf, "/")
++			if relName, insideRoot := getRelativePathInsideBase(f.root, fullPath); insideRoot {
++				notifyFunc(relName, fs.EntryObject)
++			}
++			continue
++		}
++
+ 		fullPath, err := getItemFullPath(&item)
+ 		if err != nil {
+ 			fs.Errorf(f, "Could not get item full path: %s", err)
+@@ -3143,6 +3170,16 @@ func (f *Fs) changeNotifyRunner(ctx context.Context, notifyFunc func(string, fs.
+ 			continue
+ 		}
+ 
++		// movido/renomeado: avisa também a pasta onde ele estava
++		if old, ok := f.seen.Load(item.GetID()); ok && old.(string) != relName {
++			f.seen.Store(item.GetID(), relName)
++			if item.GetFolder() != nil {
++				notifyFunc(old.(string), fs.EntryDirectory)
++			} else {
++				notifyFunc(old.(string), fs.EntryObject)
++			}
++		}
++
+ 		if item.GetFile() != nil {
+ 			notifyFunc(relName, fs.EntryObject)
+ 		} else if item.GetFolder() != nil {
+@@ -3153,6 +3190,37 @@ func (f *Fs) changeNotifyRunner(ctx context.Context, notifyFunc func(string, fs.
+ 	return
+ }
+ 
++// goneParent marca no cache uma pasta que não existe mais (":" não é válido em nomes do OneDrive)
++const goneParent = ":gone"
++
++// changeNotifyParentPath devolve o caminho de uma pasta pelo ID ("" = raiz do drive); ok=false se ela não existe mais
++func (f *Fs) changeNotifyParentPath(ctx context.Context, id string, cache map[string]string) (string, bool) {
++	if p, ok := cache[id]; ok {
++		return p, p != goneParent
++	}
++	var info api.Item
++	opts := f.newOptsCall(id, "GET", "")
++	opts.Parameters = url.Values{"$select": {"id,name,parentReference"}}
++	err := f.pacer.Call(func() (bool, error) {
++		resp, err := f.srv.CallJSON(ctx, &opts, nil, &info)
++		return shouldRetry(ctx, resp, err)
++	})
++	if err != nil {
++		fs.Debugf(f, "ChangeNotify: pasta %s não encontrada: %v", id, err)
++		cache[id] = goneParent
++		return "", false
++	}
++	p := ""
++	if info.GetParentReference().ID != "" {
++		if p, err = getItemFullPath(&info); err != nil {
++			cache[id] = goneParent
++			return "", false
++		}
++	}
++	cache[id] = p
++	return p, true
++}
++
+ func getItemFullPath(item *api.Item) (fullPath string, err error) {
+ 	err = nil
+ 	fullPath = item.GetName()
 diff --git a/backend/union/union.go b/backend/union/union.go
 index 1cb0942..f03f485 100644
 --- a/backend/union/union.go
