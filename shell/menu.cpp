@@ -17,8 +17,10 @@ HMODULE g_module;
 std::atomic<long> g_objects{0};
 std::atomic<long> g_locks{0};
 
-// {B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010}
+// {B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010}: arquivos e pastas
 const CLSID kRootClsid = {0xb1e6f0a0, 0x5c3d, 0x4e7a, {0x9b, 0x21, 0x0d, 0x36, 0x5a, 0x0e, 0x00, 0x10}};
+// {B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0011}: fundo de pasta (só na nuvem; fora dela não há o que mover)
+const CLSID kBackgroundClsid = {0xb1e6f0a0, 0x5c3d, 0x4e7a, {0x9b, 0x21, 0x0d, 0x36, 0x5a, 0x0e, 0x00, 0x11}};
 
 std::wstring RegString(const wchar_t* name) {
     wchar_t buf[4096];
@@ -40,6 +42,33 @@ std::wstring FirstPath(IShellItemArray* items) {
     }
     item->Release();
     return result;
+}
+
+// Todos os itens selecionados (para "Mover para o OneDrive 365"), separados por '|' (inválido em nomes do Windows)
+std::wstring AllPaths(IShellItemArray* items) {
+    std::wstring result;
+    DWORD count = 0;
+    if (!items || FAILED(items->GetCount(&count))) return result;
+    for (DWORD i = 0; i < count; ++i) {
+        IShellItem* item = nullptr;
+        if (FAILED(items->GetItemAt(i, &item))) continue;
+        PWSTR path = nullptr;
+        if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+            if (!result.empty()) result += L'|';
+            result += path;
+            CoTaskMemFree(path);
+        }
+        item->Release();
+    }
+    return result;
+}
+
+// Item do PC que pode ir para a nuvem: caminho de disco local (C:\..., D:\...), fora das pastas que já estão na nuvem
+bool MovableToCloud(const std::wstring& path) {
+    if (path.size() < 4 || path[1] != L':' || path[2] != L'\\') return false;   // raiz de unidade e caminhos de rede não
+    const wchar_t root[] = {path[0], L':', L'\\', 0};
+    const UINT type = GetDriveTypeW(root);
+    return type == DRIVE_FIXED || type == DRIVE_REMOVABLE;
 }
 
 // Pasta do módulo (instalação do app): os ícones do submenu ficam em menuicons\<ação>.ico
@@ -119,8 +148,8 @@ private:
 
 class SubCommand final : public CommandBase {
 public:
-    enum Filter { All, FoldersOnly, OfficeOnly };
-    SubCommand(const wchar_t* title, const wchar_t* action, Filter filter = All)
+    enum Filter { InCloud, FoldersOnly, OfficeOnly, OutsideCloud };
+    SubCommand(const wchar_t* title, const wchar_t* action, Filter filter = InCloud)
         : title_(title), action_(action), filter_(filter) {}
 
     IFACEMETHODIMP GetTitle(IShellItemArray*, LPWSTR* name) override { return SHStrDupW(title_, name); }
@@ -128,8 +157,12 @@ public:
         return SHStrDupW((ModuleDir() + L"menuicons\\" + action_ + L".ico").c_str(), icon);
     }
     IFACEMETHODIMP GetState(IShellItemArray* items, BOOL, EXPCMDSTATE* state) override {
-        const bool show = filter_ == FoldersOnly ? IsFolder(items)
-                        : filter_ == OfficeOnly ? !IsFolder(items) && IsOfficeFile(FirstPath(items))
+        const std::wstring path = FirstPath(items);
+        const bool inCloud = UnderCloudRoot(path);
+        const bool show = filter_ == OutsideCloud ? !inCloud && MovableToCloud(path)
+                        : !inCloud ? false
+                        : filter_ == FoldersOnly ? IsFolder(items)
+                        : filter_ == OfficeOnly ? !IsFolder(items) && IsOfficeFile(path)
                         : true;
         *state = show ? ECS_ENABLED : ECS_HIDDEN;
         return S_OK;
@@ -141,10 +174,12 @@ public:
         if (path.empty()) return E_FAIL;
         // Como a extensão do Google Drive: fala direto com o app que já está rodando, pela pipe dele.
         // Abrir o exe de 98 MB a cada clique custava de 0,5 s (em cache) a vários segundos.
-        if (SendToApp(L"action:" + std::wstring(action_) + L"|" + path)) return S_OK;
+        // Mover leva a seleção inteira; as outras ações trabalham no primeiro item
+        const std::wstring arg = filter_ == OutsideCloud ? AllPaths(items) : path;
+        if (SendToApp(L"action:" + std::wstring(action_) + L"|" + arg)) return S_OK;
         const std::wstring exe = RegString(L"Exe");
         if (exe.empty()) return E_FAIL;
-        std::wstring cmd = L"\"" + exe + L"\" --action " + action_ + L" \"" + path + L"\"";
+        std::wstring cmd = L"\"" + exe + L"\" --action " + action_ + L" \"" + arg + L"\"";
         STARTUPINFOW si{sizeof(si)};
         PROCESS_INFORMATION pi{};
         if (!CreateProcessW(exe.c_str(), &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
@@ -205,6 +240,7 @@ public:
         items_.push_back(new (std::nothrow) SubCommand(L"Exibir online", L"web"));
         items_.push_back(new (std::nothrow) SubCommand(L"Abrir com salvamento automático", L"office", SubCommand::OfficeOnly));
         items_.push_back(new (std::nothrow) SubCommand(L"Cor da pasta", L"color", SubCommand::FoldersOnly));
+        items_.push_back(new (std::nothrow) SubCommand(L"Mover para o OneDrive 365", L"move", SubCommand::OutsideCloud));
     }
     ~SubEnum() {
         for (auto* c : items_) if (c) c->Release();
@@ -251,6 +287,13 @@ private:
 
 class RootCommand final : public CommandBase {
 public:
+    explicit RootCommand(bool background) : background_(background) {}
+    // Na nuvem: menu completo. Fora (só arquivos e pastas, não o fundo): "Mover para o OneDrive 365", como o OneDrive.
+    IFACEMETHODIMP GetState(IShellItemArray* items, BOOL, EXPCMDSTATE* state) override {
+        const std::wstring path = FirstPath(items);
+        *state = UnderCloudRoot(path) || (!background_ && MovableToCloud(path)) ? ECS_ENABLED : ECS_HIDDEN;
+        return S_OK;
+    }
     IFACEMETHODIMP GetTitle(IShellItemArray*, LPWSTR* name) override { return SHStrDupW(L"OneDrive 365", name); }
     IFACEMETHODIMP GetFlags(EXPCMDFLAGS* flags) override { *flags = ECF_HASSUBCOMMANDS; return S_OK; }
     IFACEMETHODIMP Invoke(IShellItemArray*, IBindCtx*) override { return E_NOTIMPL; }
@@ -258,11 +301,14 @@ public:
         *e = new (std::nothrow) SubEnum();
         return *e ? S_OK : E_OUTOFMEMORY;
     }
+
+private:
+    bool background_;
 };
 
 class Factory final : public IClassFactory {
 public:
-    Factory() { ++g_objects; }
+    explicit Factory(bool background) : background_(background) { ++g_objects; }
     ~Factory() { --g_objects; }
     IFACEMETHODIMP QueryInterface(REFIID riid, void** ppv) override {
         if (riid == IID_IUnknown || riid == IID_IClassFactory) {
@@ -282,7 +328,7 @@ public:
     IFACEMETHODIMP CreateInstance(IUnknown* outer, REFIID riid, void** ppv) override {
         *ppv = nullptr;
         if (outer) return CLASS_E_NOAGGREGATION;
-        auto* c = new (std::nothrow) RootCommand();
+        auto* c = new (std::nothrow) RootCommand(background_);
         if (!c) return E_OUTOFMEMORY;
         const HRESULT hr = c->QueryInterface(riid, ppv);
         c->Release();
@@ -292,6 +338,7 @@ public:
 
 private:
     std::atomic<long> ref_{1};
+    bool background_;
 };
 
 }  // namespace
@@ -306,8 +353,8 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
 
 STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void** ppv) {
     *ppv = nullptr;
-    if (clsid != kRootClsid) return CLASS_E_CLASSNOTAVAILABLE;
-    auto* f = new (std::nothrow) Factory();
+    if (clsid != kRootClsid && clsid != kBackgroundClsid) return CLASS_E_CLASSNOTAVAILABLE;
+    auto* f = new (std::nothrow) Factory(clsid == kBackgroundClsid);
     if (!f) return E_OUTOFMEMORY;
     const HRESULT hr = f->QueryInterface(riid, ppv);
     f->Release();

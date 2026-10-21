@@ -428,6 +428,7 @@
 <div class="modal-back" id="pickBack" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
   <div class="modal">
     <header><h2 id="pickTitle">Escolher pastas</h2><div class="muted" id="pickSub"></div></header>
+    <div class="libbar"><button id="pickAll">Selecionar tudo</button><button id="pickNone">Desmarcar tudo</button></div>
     <div class="tree" id="tree"></div>
     <div class="foot">
       <span class="muted" id="pickCount"></span>
@@ -710,6 +711,13 @@
   const ancestorOff = (rel) => [...pick.excluded].some((x) => rel.startsWith(x + "/"));
   const partial = (rel) => [...pick.excluded].some((x) => x.startsWith(rel + "/"));
 
+  // "*" = arquivos soltos na raiz da pasta (sem isso, desmarcar todas as subpastas ainda enviava esses arquivos)
+  const ROOT_FILES = "*";
+  const rootFilesHtml = () => `<div data-node="*"><div class="node ${isOff(ROOT_FILES) ? "off" : ""}">
+      <button class="tw none" tabindex="-1" aria-hidden="true"></button>
+      <input type="checkbox" data-chk="*" ${isOff(ROOT_FILES) ? "" : "checked"}>
+      <svg class="f" viewBox="0 0 20 20" style="color:#8a8a8a"><path fill="currentColor" d="M5 2h6.6L16 6.4V17a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm6 1.4V7h3.6L11 3.4Z"/></svg>
+      <span class="nm">Arquivos soltos nesta pasta</span></div></div>`;
   function openPicker(id) {
     const f = S.folders.find((x) => x.id === id);
     pick = { id, excluded: new Set(f.excluded || []), loaded: new Set() };
@@ -748,8 +756,9 @@
     updateCount();
   }
   function updateCount() {
-    const n = pick ? pick.excluded.size : 0;
-    $("#pickCount").textContent = n ? `${n} pasta(s) fora do backup` : "Todas as pastas vão para o OneDrive";
+    const n = pick ? [...pick.excluded].filter((x) => x !== ROOT_FILES).length : 0, loose = pick && pick.excluded.has(ROOT_FILES);
+    $("#pickCount").textContent = !n && !loose ? "Todas as pastas vão para o OneDrive"
+      : [n && `${n} pasta(s)`, loose && "arquivos soltos"].filter(Boolean).join(" e ") + " fora do backup";
   }
   document.addEventListener("change", (e) => {
     const rel = e.target.dataset.chk;
@@ -761,6 +770,11 @@
     }
     refreshChecks();
   });
+  // Selecionar tudo / Desmarcar tudo: atua nas pastas do primeiro nível (o que está dentro delas acompanha)
+  const topRels = () => [...document.querySelectorAll('[data-kids=""] > [data-node], [data-kids=""] > div > .node [data-chk]')]
+    .map((e) => e.dataset.node ?? e.dataset.chk).filter((r) => r != null && !r.includes("/"));
+  $("#pickAll").onclick = () => { if (!pick) return; pick.excluded.clear(); refreshChecks(); };
+  $("#pickNone").onclick = () => { if (!pick) return; pick.excluded = new Set(topRels()); refreshChecks(); };
   // ---- Triagem: "Adicionar bibliotecas que eu acesso" ----
   let libs = null, libPick = new Set();
   function openLibPicker() {
@@ -824,7 +838,8 @@
       const box = document.querySelector(`[data-kids="${CSS.escape(m.payload.rel)}"]`);
       if (box) {
         pick.loaded.add(m.payload.rel);
-        box.innerHTML = m.payload.dirs.length ? m.payload.dirs.map(nodeHtml).join("") : `<div class="node muted">Sem subpastas</div>`;
+        box.innerHTML = (m.payload.rel === "" ? rootFilesHtml() : "") +
+          (m.payload.dirs.length ? m.payload.dirs.map(nodeHtml).join("") : m.payload.rel === "" ? "" : `<div class="node muted">Sem subpastas</div>`);
         refreshChecks();
       }
       return;

@@ -48,7 +48,7 @@
               <desktop5:Verb Id="OneDrive365" Clsid="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="Directory\Background">
-              <desktop5:Verb Id="OneDrive365" Clsid="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010" />
+              <desktop5:Verb Id="OneDrive365" Clsid="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0011" />
             </desktop5:ItemType>
           </desktop4:FileExplorerContextMenus>
         </desktop4:Extension>
@@ -56,6 +56,7 @@
           <com:ComServer>
             <com:SurrogateServer DisplayName="OneDrive 365">
               <com:Class Id="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0010" Path="OneDrive365Menu.dll" ThreadingModel="STA" />
+              <com:Class Id="B1E6F0A0-5C3D-4E7A-9B21-0D365A0E0011" Path="OneDrive365Menu.dll" ThreadingModel="STA" />
             </com:SurrogateServer>
           </com:ComServer>
         </com:Extension>

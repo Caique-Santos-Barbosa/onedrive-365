@@ -67,7 +67,9 @@ static class MenuPackage
 
         Directory.CreateDirectory(Path.GetDirectoryName(Msix)!);
         File.WriteAllBytes(Msix, Resource("OneDrive365.msix"));
-        var output = await PowerShell($"Add-AppxPackage -Path '{Msix}' -ExternalLocation '{Paths.AppDir}' -ForceUpdateFromAnyVersion; if ($?) {{ 'ok' }}");
+        // ForceApplicationShutdown: o menu aberto há pouco deixa o dllhost do pacote (identidade do pacote) segurando a versão
+        // antiga (0x80073D02). Só processos com a identidade do pacote são fechados; o Explorer não tem e não é tocado.
+        var output = await PowerShell($"Add-AppxPackage -Path '{Msix}' -ExternalLocation '{Paths.AppDir}' -ForceUpdateFromAnyVersion -ForceApplicationShutdown; if ($?) {{ 'ok' }}");
         Log.Info($"Menu do Windows 11: pacote {version} (antes: {(installed == "" ? "nenhum" : installed)}) -> {output.Trim()}");
     }
 

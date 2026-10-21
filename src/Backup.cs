@@ -214,9 +214,13 @@ sealed class BackupManager : IDisposable
             if (_runCancel.TryGetValue(id, out var cts)) cts.Cancel();
     }
 
+    /// Na lista de exclusões, "*" = arquivos soltos na raiz da pasta (nenhuma pasta pode se chamar "*")
+    public const string RootFiles = "*";
+
     bool InExcludedFolder(string id, string relative)
     {
         var rel = relative.Replace('\\', '/');
+        if (!rel.Contains('/') && State(id).Excluded.Contains(RootFiles)) return true;   // arquivo solto na raiz (pastas da raiz não passam por aqui como arquivo)
         return State(id).Excluded.Any(x => rel.Equals(x, StringComparison.OrdinalIgnoreCase) || rel.StartsWith(x + "/", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -354,7 +358,8 @@ sealed class BackupManager : IDisposable
         Directory.CreateDirectory(Paths.BisyncDir);
         var filters = Path.Combine(Paths.BisyncDir, $"filters-{k.Id}.txt");
         // Subpastas desmarcadas na ⚙ ("/" no início = a partir da raiz da pasta) + arquivos temporários
-        var content = string.Join("\n", State(k.Id).Excluded.Select(x => $"- /{EscapeFilter(x)}/**").Concat(Excludes.Select(e => "- " + e))) + "\n";
+        // RootFiles ("*") = arquivos soltos na raiz: "/*" sem barra no fim só pega arquivos, não pastas
+        var content = string.Join("\n", State(k.Id).Excluded.Select(x => x == RootFiles ? "- /*" : $"- /{EscapeFilter(x)}/**").Concat(Excludes.Select(e => "- " + e))) + "\n";
         if (!File.Exists(filters) || File.ReadAllText(filters) != content) File.WriteAllText(filters, content);
 
         var remote = $"onedrive:{k.RemoteName}";

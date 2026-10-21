@@ -214,6 +214,15 @@ sealed partial class TrayApp : ApplicationContext
             return;
         }
         if (msg == "add-all") { await _ready.Task; await AddAll(); return; }
+        if (msg is "pause:on" or "pause:off")   // diagnóstico/suporte: pausa ou retoma o backup sem abrir a janela
+        {
+            await _ready.Task;
+            _backup!.Paused = msg == "pause:on";
+            _pausedUntil = null;
+            UpdateTrayIcon();
+            PushState();
+            return;
+        }
         if (msg.StartsWith("backup:")) { await _ready.Task; _backup!.SetEnabled(msg["backup:".Length..], true); return; }
         if (msg.StartsWith("action:"))
         {

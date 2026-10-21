@@ -7,6 +7,7 @@ namespace HdtDrive;
 sealed partial class TrayApp
 {
     const string MenuKey = "OneDrive365";
+    const string MoveKey = "OneDrive365Move";   // fora da nuvem: "Mover para o OneDrive 365" (como o "Mover para o OneDrive")
     // Menu clássico ("Mostrar mais opções"): arquivos, pastas e fundo de pastas. %V = pasta aberta no fundo
     static readonly (string Key, string Arg)[] MenuTargets =
     {
@@ -22,6 +23,7 @@ sealed partial class TrayApp
         if (_backup != null)
             roots.AddRange(_backup.AllFolders().Where(k => _backup.State(k.Id).Enabled).Select(k => k.LocalPath.TrimEnd('\\') + "\\"));
         var appliesTo = string.Join(" OR ", roots.Select(r => $"System.ItemPathDisplay:~<\"{r}\""));
+        RegisterMoveVerb(roots);
         var exe = $"\"{Paths.InstalledExe}\"";
 
         // Menu do Windows 11 (OneDrive365Menu.dll) lê as mesmas pastas daqui
@@ -61,10 +63,85 @@ sealed partial class TrayApp
         }
     }
 
+    /// Menu clássico fora da nuvem: arquivos e pastas (não o fundo), no lugar onde o OneDrive põe "Mover para o OneDrive".
+    void RegisterMoveVerb(IEnumerable<string> roots)
+    {
+        var outside = string.Join(" AND ", roots.Select(r => $"NOT System.ItemPathDisplay:~<\"{r}\""));
+        foreach (var (target, arg) in MenuTargets.Where(t => !t.Key.Contains("Background")))
+        {
+            using var k = Registry.CurrentUser.CreateSubKey($@"{target}\{MoveKey}");
+            k.SetValue("MUIVerb", "Mover para o OneDrive 365");
+            k.SetValue("Icon", ShellIntegration.CloudIconResource);
+            k.SetValue("AppliesTo", outside);
+            using var c = k.CreateSubKey("command");
+            c.SetValue("", $"\"{Paths.InstalledExe}\" --action move \"{arg}\"");
+        }
+    }
+
+    /// "Mover para o OneDrive 365": leva os itens para M:\Meu OneDrive com a janela de progresso do Windows
+    /// (conflito de nome pergunta como no Explorer) e mostra o resultado selecionado na unidade.
+    async Task MoveToCloud(string[] paths)
+    {
+        var dest = Path.Combine(_settings.DriveLetter + "\\", Brand.OneDriveFolder);
+        if (!_rclone.Running || !Directory.Exists(dest))
+        {
+            MessageBox.Show("A unidade do OneDrive 365 não está conectada agora. Tente de novo em instantes.", Brand.Name, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        // Pastas do sistema e do perfil não saem do lugar (para elas existe o backup em "Pastas do computador")
+        var special = new[] { Environment.SpecialFolder.UserProfile, Environment.SpecialFolder.Desktop, Environment.SpecialFolder.MyDocuments,
+            Environment.SpecialFolder.MyPictures, Environment.SpecialFolder.MyMusic, Environment.SpecialFolder.MyVideos,
+            Environment.SpecialFolder.Windows, Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86 }
+            .Select(f => Environment.GetFolderPath(f).TrimEnd('\\'))
+            .Append(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"))
+            .Where(p => p.Length > 0).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var blocked = paths.Where(p => special.Contains(p.TrimEnd('\\'))).ToList();
+        if (blocked.Count > 0)
+        {
+            MessageBox.Show($"\"{Path.GetFileName(blocked[0].TrimEnd('\\'))}\" é uma pasta do Windows e não pode ser movida.\n\n" +
+                "Para mandar o conteúdo dela para a nuvem, ligue o backup em Pastas do computador.", Brand.Name, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            paths = paths.Except(blocked).ToArray();
+        }
+        var moved = new List<string>();
+        var done = new TaskCompletionSource();
+        // A janela de progresso do Windows roda numa thread STA própria: a bandeja continua respondendo
+        var t = new Thread(() =>
+        {
+            foreach (var src in paths)
+            {
+                var target = Path.Combine(dest, Path.GetFileName(src.TrimEnd('\\')));
+                try
+                {
+                    if (Directory.Exists(src))
+                        Microsoft.VisualBasic.FileIO.FileSystem.MoveDirectory(src, target, Microsoft.VisualBasic.FileIO.UIOption.AllDialogs, Microsoft.VisualBasic.FileIO.UICancelOption.ThrowException);
+                    else
+                        Microsoft.VisualBasic.FileIO.FileSystem.MoveFile(src, target, Microsoft.VisualBasic.FileIO.UIOption.AllDialogs, Microsoft.VisualBasic.FileIO.UICancelOption.ThrowException);
+                    moved.Add(target);
+                }
+                catch (OperationCanceledException) { break; }   // a pessoa cancelou na janela do Windows
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    Log.Error($"Mover {src}", ex);
+                    MessageBox.Show($"Não consegui mover \"{Path.GetFileName(src)}\": {ex.Message}", Brand.Name, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            done.SetResult();
+        });
+        t.SetApartmentState(ApartmentState.STA);
+        t.Start();
+        await done.Task;
+        Log.Info($"Movidos para o OneDrive 365: {moved.Count} de {paths.Length}");
+        if (moved.Count > 0)
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{moved[0]}\"");
+    }
+
     public static void RemoveContextMenu()
     {
         foreach (var (target, _) in MenuTargets)
+        {
             Registry.CurrentUser.DeleteSubKeyTree($@"{target}\{MenuKey}", throwOnMissingSubKey: false);
+            Registry.CurrentUser.DeleteSubKeyTree($@"{target}\{MoveKey}", throwOnMissingSubKey: false);
+        }
     }
 
     /// Caminho Graph do item correspondente a um caminho local (M:\... ou pasta com backup); null se não está na nuvem.
@@ -115,6 +192,7 @@ sealed partial class TrayApp
     {
         await _ready.Task;
         if (action == "color") { await SetFolderColor(path); return; }
+        if (action == "move") { await MoveToCloud(path.Split('|', StringSplitOptions.RemoveEmptyEntries)); return; }
         await LoadAccountAsync(force: false);
         var cloud = CloudPath(path);
         var item = cloud == null ? null : await Graph.Item(cloud);
