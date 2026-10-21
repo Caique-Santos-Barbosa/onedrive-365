@@ -1,4 +1,4 @@
-﻿# Uso: pwsh tools\tests\regressao.ps1  (com o app instalado e logado; precisa da pasta M:\Meu OneDrive\_icone_teste\cor para o teste de cor)
+﻿# Uso: pwsh tools\tests\regressao.ps1  (com o app instalado e logado; o teste de cor cria e apaga a própria pasta _icone_teste)
 # Bateria de regressão passiva do OneDrive 365 (não mexe em mouse/teclado; desfaz o que muda).
 $ErrorActionPreference = 'Continue'
 $app = "$env:LOCALAPPDATA\OneDrive 365"; $log = "$app\logs\app.log"
@@ -41,10 +41,13 @@ Check 'menu do Explorer (DLL) entrega na pipe' {
   @(($LASTEXITCODE -eq 0), 'subitens listados')
 }
 Check 'cor de pasta nova aparece (amarela -> cor)' {
+  # A pasta de teste é criada aqui e apagada no fim pela nuvem (rclone), sem passar pelo M: e sem o aviso de exclusão
+  New-Item -ItemType Directory -Force 'M:\Meu OneDrive\_icone_teste\cor' | Out-Null
   $n = (Get-Content $log).Count; Pipe 'setcolor:green|M:\Meu OneDrive\_icone_teste\cor'; Start-Sleep 2
   $ok = (LogSince $n) -match 'Cor da pasta .*cor: green em (\d+) ms'; $ms = $matches[1]
   Pipe 'setcolor:yellow|M:\Meu OneDrive\_icone_teste\cor'; Start-Sleep 1
-  @(($ok -and -not ((LogSince $n) -match 'remontando|rclone mount parado')), "aplicada em $ms ms, sem remontar")
+  & "$app\bin\rclone.exe" --config "$app\rclone.conf" purge 'onedrive:_icone_teste' 2>$null
+  @(($ok -and (Test-Path "$app\overlay") -and -not ((LogSince $n) -match 'remontando|rclone mount parado')), "aplicada em $ms ms, sem remontar")
 }
 Check 'erros no log desde o início' { $errs = Select-String $log -Pattern ' ERRO ' | Where-Object { $_.Line -match (Get-Date -Format 'yyyy-MM-dd') } | Select-Object -Last 5; @(($true), "$(@($errs).Count) erro(s) hoje (informativo)") }
 $results | Format-Table -AutoSize | Out-String -Width 220
