@@ -30,6 +30,11 @@ sealed class Flyout : Form
         BackColor = Color.FromArgb(0xF9, 0xF9, 0xF9);
         Controls.Add(_web);
         Deactivate += (_, _) => HidePanel();
+        // Trava de posição: o Windows reescala a janela ao trocar de tela (WM_DPICHANGED) e ela descia para trás da
+        // barra de tarefas. Qualquer mudança de tamanho/posição enquanto aberto volta para o retângulo calculado.
+        DpiChanged += (_, e) => { e.Cancel = true; Pin(); };
+        Move += (_, _) => Pin();
+        Resize += (_, _) => Pin();
         Load += async (_, _) => { if (!await WebViewEnv.Run(this, InitAsync)) Close(); };
     }
 
@@ -85,20 +90,55 @@ sealed class Flyout : Form
     {
         // O clique no ícone tira o foco do painel antes de chegar aqui: sem isso ele fecharia e reabriria
         if (Visible || DateTime.Now - _hiddenAt < TimeSpan.FromMilliseconds(250)) { HidePanel(); return; }
-        int S(int v) => DeviceDpi * v / 96;
-        var area = Screen.FromPoint(Cursor.Position).WorkingArea;
-        var size = new Size(S(380), Math.Min(S(640), area.Height - S(24)));
-        // Encostado no canto da área de trabalho perto da bandeja (barra embaixo, em cima, ou dos lados)
-        var x = Math.Clamp(Cursor.Position.X - size.Width / 2, area.Left + S(12), area.Right - size.Width - S(12));
-        var y = Cursor.Position.Y > area.Bottom - S(4) || Cursor.Position.Y > area.Top + area.Height / 2
-            ? area.Bottom - size.Height - S(12)
-            : area.Top + S(12);
-        Bounds = new Rectangle(x, y, size.Width, size.Height);
+        _target = PanelRect();
+        Bounds = _target;
         Show();
+        Pin();
         Activate();
         Push();
         if (_ready) _web.CoreWebView2.PostWebMessageAsJson("{\"type\":\"shown\"}");
     }
+
+    Rectangle _target;
+    (string Screen, int X)? _anchor;   // último clique no ícone: abre sempre no mesmo lugar, mesmo vindo de outro caminho
+
+    void Pin()
+    {
+        if (Visible && !_target.IsEmpty && Bounds != _target) Bounds = _target;
+    }
+
+    /// Acima do ícone da bandeja, na tela da barra de tarefas e com a escala DESSA tela, sempre dentro da área útil.
+    Rectangle PanelRect()
+    {
+        var p = Cursor.Position;
+        var screen = Screen.FromPoint(p);
+        if (!screen.WorkingArea.Contains(p)) _anchor = (screen.DeviceName, p.X);   // clicou na barra de tarefas
+        else if (_anchor is { } a && Screen.AllScreens.FirstOrDefault(x => x.DeviceName == a.Screen) is { } s0) screen = s0;
+        else screen = Screen.PrimaryScreen ?? screen;
+        var area = screen.WorkingArea;
+        var anchorX = _anchor is { } b && b.Screen == screen.DeviceName ? b.X : area.Right;
+
+        var dpi = MonitorDpi(screen);
+        int S(int v) => dpi * v / 96;
+        var size = new Size(Math.Min(S(380), area.Width - S(24)), Math.Min(S(640), area.Height - S(24)));
+        var x = Math.Clamp(anchorX - size.Width / 2, area.Left + S(12), area.Right - size.Width - S(12));
+        var taskbarOnTop = area.Top > screen.Bounds.Top && area.Bottom == screen.Bounds.Bottom;
+        var y = taskbarOnTop ? area.Top + S(12) : area.Bottom - size.Height - S(12);
+        return new Rectangle(x, y, size.Width, size.Height);
+    }
+
+    static int MonitorDpi(Screen screen)
+    {
+        var c = screen.Bounds;
+        var mon = MonitorFromPoint(new Point(c.Left + c.Width / 2, c.Top + c.Height / 2), 2 /* MONITOR_DEFAULTTONEAREST */);
+        return GetDpiForMonitor(mon, 0 /* MDT_EFFECTIVE_DPI */, out var dx, out _) == 0 && dx > 0 ? (int)dx : 96;
+    }
+
+    [DllImport("user32.dll")]
+    static extern IntPtr MonitorFromPoint(Point pt, uint flags);
+
+    [DllImport("shcore.dll")]
+    static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint dpiX, out uint dpiY);
 
     /// Diagnóstico: captura o conteúdo do painel num PNG.
     public async Task CaptureAsync(string png)

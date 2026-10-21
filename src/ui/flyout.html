@@ -173,6 +173,7 @@
       const folder = folderName(x.where);
       const line = x.status === "uploading" ? `Enviando para <a data-open="${esc(x.where)}">${esc(folder)}</a> ${x.percent ?? 0}%`
         : x.status === "error" ? `<span class="err">Não foi possível enviar</span>`
+        : x.status === "downloaded" ? `Baixado em <a data-reveal="${esc(x.path || "")}">${esc(folder)}</a>`
         : `Disponível em <a data-reveal="${esc(x.path || "")}">${esc(folder)}</a>`;
       return `<div class="item" data-file="${esc(x.path || "")}" title="${esc(x.where + "\\" + x.name)}">
         <img src="${img}" alt="">

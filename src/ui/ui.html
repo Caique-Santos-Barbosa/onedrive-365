@@ -602,7 +602,7 @@
       $("#actBody").innerHTML = `<div class="empty">${icon("cloud")}<h2>Nenhuma atividade ainda</h2><div>Os arquivos que você salvar em ${esc(S.letter)} e o backup das pastas do PC vão aparecer aqui.</div></div>`;
       return;
     }
-    const label = { uploading: ["sync", "Enviando"], done: ["ok", "Enviado"], error: ["error", "Erro"], backup: ["ok", "Backup"] };
+    const label = { uploading: ["sync", "Enviando"], done: ["ok", "Enviado"], error: ["error", "Erro"], backup: ["ok", "Backup"], downloaded: ["ok", "Baixado"] };
     $("#actBody").innerHTML = resumeBlock + progressBlock(prog) + (items.length ? `<table style="margin-top:12px"><colgroup><col><col class="c-size"><col class="c-status"><col class="c-act"></colgroup>
       <thead><tr><th>Nome</th><th style="text-align:right;padding-right:14px">Tamanho</th><th>Status</th><th></th></tr></thead><tbody>${items.map((x) => {
       const [k, t] = label[x.status] || ["ok", x.status];

@@ -18,6 +18,7 @@ sealed partial class TrayApp : ApplicationContext
     string _status = "Iniciando…";
     string _backupStatus = "";
     BackupManager? _backup;
+    CacheWatcher? _cacheWatcher;
     bool _quitting;
 
     string Letter => _settings.DriveLetter!;
@@ -119,6 +120,8 @@ sealed partial class TrayApp : ApplicationContext
                 _ = KeepTryingToMount();
             }
             _statusTimer.Start();
+            try { _cacheWatcher ??= new CacheWatcher(() => Letter, (rel, size) => _ui.BeginInvoke(() => OnDownloaded(rel, size))); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { Log.Error("Vigia do cache", ex); }
             await RefreshStatus();
             _backup = new BackupManager(_settings, s => _ui.BeginInvoke(() => { _backupStatus = s; PushState(); }))
             {
@@ -442,6 +445,7 @@ sealed partial class TrayApp : ApplicationContext
         _quitting = true;
         _statusTimer.Stop();
         _backup?.Dispose();
+        _cacheWatcher?.Dispose();
         try { await _rclone.Stop(TimeSpan.FromSeconds(confirm ? 0 : 20)); }
         catch (MountStuckException) { Log.Error("Saindo com a montagem presa; o reinício do Windows libera"); }
         _tray.Visible = false;

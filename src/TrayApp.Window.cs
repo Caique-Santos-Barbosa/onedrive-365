@@ -122,6 +122,12 @@ sealed partial class TrayApp
         };
     }
 
+    static long? FreeCacheDiskBytes()
+    {
+        try { return new DriveInfo(Path.GetPathRoot(Paths.CacheDir)!).AvailableFreeSpace; }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException) { return null; }
+    }
+
     object StatusInfo()
     {
         if (_signedOut) return new { kind = "error", title = "Desconectado", detail = "Entre com a sua conta Microsoft para ver seus arquivos." };
@@ -139,6 +145,10 @@ sealed partial class TrayApp
             };
         if (_status.StartsWith("Unidade presa") || _status.StartsWith("Desconectado") || _status.StartsWith("Erro"))
             return new { kind = "error", title = "Com problemas", detail = _status };
+        // Abaixo de 2 GB livres o rclone esvazia o cache (--vfs-cache-min-free-space): o que se abre não fica no PC
+        if (FreeCacheDiskBytes() is { } free && free < 2L << 30)
+            return new { kind = "error", title = $"Pouco espaço no disco {Path.GetPathRoot(Paths.CacheDir)!.TrimEnd('\\')}",
+                detail = $"Só {SizeText(free)} livres. Os arquivos abrem normalmente, mas não ficam guardados no PC até você liberar espaço (mínimo 2 GB)." };
         if (_backup?.Paused == true)
             return new { kind = "paused", title = "Sincronização pausada", detail = "A unidade continua funcionando. O backup das pastas do PC volta quando você retomar." };
         if (!InSchedule())
@@ -188,7 +198,7 @@ sealed partial class TrayApp
             var items = JsonSerializer.Deserialize<List<ActivityItem>>(File.ReadAllText(ActivityFile));
             if (items == null) return;
             // Quem estava "enviando" quando o app fechou não tem status confiável: o cache retoma o envio
-            _activity.AddRange(items.Where(i => i.Status != "uploading"));
+            _activity.AddRange(items.Where(i => i.Status != "uploading" && !IsInternal(i.Name)));
             _lastActivity = _activity.FirstOrDefault()?.Time;
         }
         catch (Exception ex) when (ex is IOException or JsonException) { Log.Error("activity.json ilegível", ex); }
@@ -208,7 +218,7 @@ sealed partial class TrayApp
     /// Diferença da fila de upload: o que entrou está "Enviando", o que saiu foi "Enviado".
     void TrackQueue(IReadOnlyCollection<Rclone.QueueItem> queue)
     {
-        var now = queue.ToDictionary(q => q.Name.Replace('/', '\\'), q => q.Size, StringComparer.OrdinalIgnoreCase);
+        var now = queue.Where(q => !IsInternal(Path.GetFileName(q.Name))).ToDictionary(q => q.Name.Replace('/', '\\'), q => q.Size, StringComparer.OrdinalIgnoreCase);
         var changed = false;
         foreach (var (rel, size) in now)
             if (!_lastQueue.ContainsKey(rel)) { AddActivity(Item(rel, size, "uploading")); changed = true; }
@@ -219,6 +229,17 @@ sealed partial class TrayApp
 
         ActivityItem Item(string rel, long size, string status) => new(DateTime.Now, Path.GetFileName(rel),
             Path.GetDirectoryName(Path.Combine(_settings.DriveLetter + "\\", rel)) ?? "", Path.Combine(_settings.DriveLetter + "\\", rel), size, status);
+    }
+
+    /// desktop.ini é a cor/ícone de pasta gravado pelo próprio app: não é atividade do usuário
+    static bool IsInternal(string name) => name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase);
+
+    /// Arquivo aberto no M: terminou de baixar: aparece na atividade como no OneDrive ("Baixado")
+    void OnDownloaded(string rel, long size)
+    {
+        var path = Path.Combine(_settings.DriveLetter + "\\", rel);
+        AddActivity(new ActivityItem(DateTime.Now, Path.GetFileName(rel), Path.GetDirectoryName(path) ?? "", path, size, "downloaded"));
+        PushState();
     }
 
     void OnBackupProgress(BackupManager.Progress? p)
