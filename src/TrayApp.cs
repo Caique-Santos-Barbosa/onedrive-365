@@ -200,6 +200,13 @@ sealed partial class TrayApp : ApplicationContext
             await _window!.CaptureAsync(parts[1]);
             return;
         }
+        if (msg.StartsWith("state:"))   // diagnóstico: grava o estado que a janela e o painel recebem (JSON) para revisão/prints
+        {
+            await _ready.Task;
+            var json = System.Text.Json.JsonSerializer.Serialize(BuildState(), new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+            File.WriteAllText(msg["state:".Length..], json);
+            return;
+        }
         if (msg == "quit") { await Quit(confirm: false); return; }
         if (msg == "diag:throw")   // diagnóstico: erro proposital fora de qualquer try (testa a rede de segurança do Program)
         {

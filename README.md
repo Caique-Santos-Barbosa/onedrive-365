@@ -10,7 +10,7 @@ O OneDrive e o SharePoint aparecem como uma unidade do Windows (`M:`). Tudo é l
 
 [![Assistir à apresentação do OneDrive 365](docs/video-capa.png)](https://github.com/Caique-Santos-Barbosa/onedrive-365/releases/download/v1.1.0/OneDrive365-apresentacao.mp4)
 
-[**⬇ Baixar OneDrive365.exe**](../../releases/latest) · [Como funciona](#-o-que-fizemos-a-arquitetura-do-google-drive-com-o-onedrive) · [Telas](#-telas) · [Para TI](#-para-ti)
+[**⬇ Baixar OneDrive365.exe**](../../releases/latest) · [Vídeo vertical (4:5)](https://github.com/Caique-Santos-Barbosa/onedrive-365/releases/download/v1.1.0/OneDrive365-apresentacao-vertical.mp4) · [Como funciona](#-o-que-fizemos-a-arquitetura-do-google-drive-com-o-onedrive) · [Telas](#-telas) · [Para TI](#-para-ti)
 
 </div>
 
