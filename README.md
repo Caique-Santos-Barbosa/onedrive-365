@@ -177,8 +177,11 @@ docs/           prints
 - Assinatura de código, para acabar com o aviso do SmartScreen.
 - App OAuth próprio, para tenants que bloqueiam apps de terceiros.
 
-## 📄 Licenças
+## 📄 Licença
 
+O código deste repositório está sob a **[licença MIT](LICENSE)**: pode usar, modificar e distribuir, mantendo o aviso de copyright.
+
+Componentes de terceiros ([detalhes](THIRD-PARTY-NOTICES.md)):
 - [rclone](https://github.com/rclone/rclone): MIT.
 - [WinFsp](https://github.com/winfsp/winfsp): GPLv3 com exceção FLOSS. O instalador oficial é redistribuído sem modificação.
 
