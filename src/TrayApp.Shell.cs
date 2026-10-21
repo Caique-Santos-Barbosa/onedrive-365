@@ -23,15 +23,25 @@ sealed partial class TrayApp
         if (_backup != null)
             roots.AddRange(_backup.AllFolders().Where(k => _backup.State(k.Id).Enabled).Select(k => k.LocalPath.TrimEnd('\\') + "\\"));
         var appliesTo = string.Join(" OR ", roots.Select(r => $"System.ItemPathDisplay:~<\"{r}\""));
-        RegisterMoveVerb(roots);
         var exe = $"\"{Paths.InstalledExe}\"";
 
-        // Menu do Windows 11 (OneDrive365Menu.dll) lê as mesmas pastas daqui
+        // Menu do Windows 11 (OneDrive365Menu.dll) lê as mesmas pastas de menu-config.txt, ao lado dela: o dllhost do
+        // pacote vê um HKCU virtualizado com valores velhos (só "M:\"), então o registro fica só como reserva
         using (var state = Registry.CurrentUser.CreateSubKey(@"Software\OneDrive365"))
         {
             state.SetValue("MenuRoots", string.Join("|", roots));
             state.SetValue("Exe", Paths.InstalledExe);
         }
+        try { File.WriteAllText(Path.Combine(Paths.AppDir, "menu-config.txt"), $"Exe={Paths.InstalledExe}\nMenuRoots={string.Join("|", roots)}\n", new System.Text.UTF8Encoding(false)); }
+        catch (IOException ex) { Log.Error("menu-config.txt", ex); }
+
+        // Windows 11: os itens do pacote já aparecem também em "Mostrar mais opções"; os do registro duplicavam
+        if (Environment.OSVersion.Version.Build >= 22000)
+        {
+            RemoveContextMenu();
+            return;
+        }
+        RegisterMoveVerb(roots);
 
         foreach (var (target, arg) in MenuTargets)
         {

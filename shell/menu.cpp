@@ -89,9 +89,37 @@ bool IsFolder(IShellItemArray* items) {
     return (attrs & SFGAO_FOLDER) != 0;
 }
 
+// Configuração escrita pelo app em menu-config.txt, ao lado desta DLL ("Nome=valor", UTF-8).
+// O menu roda no dllhost do pacote, que enxerga um HKCU virtualizado (Helium\User.dat) com valores velhos;
+// arquivos da pasta externa do pacote não são virtualizados. Sem o arquivo, cai no registro (instalações antigas).
+std::wstring Config(const wchar_t* name) {
+    const std::wstring file = ModuleDir() + L"menu-config.txt";
+    HANDLE h = CreateFileW(file.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return RegString(name);
+    std::string utf8;
+    char buf[4096];
+    DWORD read = 0;
+    while (ReadFile(h, buf, sizeof(buf), &read, nullptr) && read > 0) utf8.append(buf, read);
+    CloseHandle(h);
+    const int len = MultiByteToWideChar(CP_UTF8, 0, utf8.data(), (int)utf8.size(), nullptr, 0);
+    std::wstring text(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.data(), (int)utf8.size(), &text[0], len);
+    const std::wstring key = std::wstring(name) + L"=";
+    size_t start = 0;
+    while (start < text.size()) {
+        size_t end = text.find(L'\n', start);
+        if (end == std::wstring::npos) end = text.size();
+        std::wstring line = text.substr(start, end - start);
+        if (!line.empty() && line.back() == L'\r') line.pop_back();
+        if (line.compare(0, key.size(), key) == 0) return line.substr(key.size());
+        start = end + 1;
+    }
+    return RegString(name);
+}
+
 bool UnderCloudRoot(const std::wstring& path) {
     if (path.empty()) return false;
-    const std::wstring roots = RegString(L"MenuRoots");
+    const std::wstring roots = Config(L"MenuRoots");
     size_t start = 0;
     while (start < roots.size()) {
         size_t end = roots.find(L'|', start);
@@ -177,7 +205,7 @@ public:
         // Mover leva a seleção inteira; as outras ações trabalham no primeiro item
         const std::wstring arg = filter_ == OutsideCloud ? AllPaths(items) : path;
         if (SendToApp(L"action:" + std::wstring(action_) + L"|" + arg)) return S_OK;
-        const std::wstring exe = RegString(L"Exe");
+        const std::wstring exe = Config(L"Exe");
         if (exe.empty()) return E_FAIL;
         std::wstring cmd = L"\"" + exe + L"\" --action " + action_ + L" \"" + arg + L"\"";
         STARTUPINFOW si{sizeof(si)};
