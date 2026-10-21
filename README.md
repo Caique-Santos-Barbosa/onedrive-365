@@ -81,9 +81,9 @@ Analisamos como o Google Drive para desktop funciona por dentro (`GoogleDriveFS.
 ### A unidade M: no Explorador
 | OneDrive 365 (M:) | Este Computador |
 |---|---|
-| ![](docs/screenshots/a5-explorer-unidade-m.png) | ![](docs/screenshots/a6-explorer-este-computador.png) |
+| ![](docs/screenshots/a5-explorer-unidade-m-v2.png) | ![](docs/screenshots/a6-explorer-este-computador-v2.png) |
 | **Selos: nuvem e ✓ no PC** | **Menu do botão direito** |
-| ![](docs/screenshots/a8-explorer-selos.png) | ![](docs/screenshots/20-menu-explorer.png) |
+| ![](docs/screenshots/a8-explorer-selos-v2.png) | ![](docs/screenshots/20-menu-explorer.png) |
 
 ### Office, exclusão e escolha de pastas
 | Word pela nuvem, com salvamento automático | Excluído da nuvem → lixeira |
