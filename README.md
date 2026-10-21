@@ -8,9 +8,11 @@
 
 O OneDrive e o SharePoint aparecem como uma unidade do Windows (`M:`). Tudo é listado na hora e cada arquivo só é baixado quando você abre, como no Google Drive para desktop.
 
-[![Assistir à apresentação do OneDrive 365](docs/video-capa.png)](https://github.com/Caique-Santos-Barbosa/onedrive-365/releases/download/v1.1.0/OneDrive365-apresentacao.mp4)
+[![Assistir à apresentação do OneDrive 365 no YouTube](docs/video-capa.png)](https://youtu.be/FM58veoFghI)
 
-[**⬇ Baixar OneDrive365.exe**](../../releases/latest) · [Vídeo vertical (4:5)](https://github.com/Caique-Santos-Barbosa/onedrive-365/releases/download/v1.1.0/OneDrive365-apresentacao-vertical.mp4) · [Como funciona](#-o-que-fizemos-a-arquitetura-do-google-drive-com-o-onedrive) · [Telas](#-telas) · [Para TI](#-para-ti)
+<sub>▶ Clique na imagem para assistir no YouTube (2:06). Também disponível para baixar: [16:9](https://github.com/Caique-Santos-Barbosa/onedrive-365/releases/download/v1.1.0/OneDrive365-apresentacao.mp4) · [vertical](https://github.com/Caique-Santos-Barbosa/onedrive-365/releases/download/v1.1.0/OneDrive365-apresentacao-vertical.mp4).</sub>
+
+[**⬇ Baixar OneDrive365.exe**](../../releases/latest) · [Como funciona](#-o-que-fizemos-a-arquitetura-do-google-drive-com-o-onedrive) · [Telas](#-telas) · [Para TI](#-para-ti)
 
 </div>
 
